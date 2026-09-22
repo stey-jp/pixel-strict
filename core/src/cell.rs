@@ -555,6 +555,7 @@ pub struct Metrics {
     pub preserved_detail_count: usize,
     pub silhouette_retention: f64,
     pub line_continuity_retention: f64,
+    pub line_width_retention: f64,
     pub small_detail_retention: f64,
     pub corner_edge_consistency: f64,
     pub shape_score: f64,
@@ -673,13 +674,14 @@ pub fn evaluate(
         source_lines,
         boundaries,
         source_details,
+        line_width_retention,
     ] = source_shape.retention(out, q, g, w, h);
     let line_continuity_retention = source_lines * ratio(line_kept, line_total);
     let small_detail_retention = source_details * ratio(preserved_detail_count, detail_total);
     let corner_edge_consistency = boundaries * ratio(corner_kept, corner_total);
     let shape_score = [
         silhouette_retention,
-        line_continuity_retention,
+        line_continuity_retention * line_width_retention,
         small_detail_retention,
         corner_edge_consistency,
     ]
@@ -691,6 +693,7 @@ pub fn evaluate(
     let alignment_credit = (2.0
         * silhouette_retention
             .min(line_continuity_retention)
+            .min(line_width_retention)
             .min(small_detail_retention)
             .min(corner_edge_consistency))
     .clamp(0.1, 1.0);
@@ -713,6 +716,7 @@ pub fn evaluate(
         preserved_detail_count,
         silhouette_retention,
         line_continuity_retention,
+        line_width_retention,
         small_detail_retention,
         corner_edge_consistency,
         shape_score,

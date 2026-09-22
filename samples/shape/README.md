@@ -12,6 +12,8 @@ cargo run --release --locked --manifest-path core/Cargo.toml --example shape_sam
 
 `*-input.png`が入力、`*-manual.png`はGrid 48・Preserve・Colors 32・Smoothing 3・Edge 2・Shape 2、`*-auto.png`は同設定でGrid Autoです。対応JSONに候補評価を出力します。画像は48×48で、ManualはP=1。拡大時にも補間しないで比較してください。
 
+線幅評価の追加後、`line-heavy`のAutoは旧`672740c`のGrid 12（P=4）からGrid 48（P=1）へ変更。縦横の1px線と斜線の太さ・位置が入力と一致します。両解像度モードで1/2/4倍入力と上下反転を回帰テストし、拡大済みの線を不要に細くしないことも確認しています。各候補の`metrics.line_width_retention`で線幅保持率を確認できます。
+
 旧版`9f081f1`の同じManual設定との比較:
 
 | 確認対象 | 旧版 | Shape改善後 |

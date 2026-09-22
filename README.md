@@ -73,6 +73,8 @@ Preserveでは`source_width % P == 0`かつ`source_height % P == 0`が必須で�
 
 セル判定は元の配列を参照する二重バッファ方式で、処理順による色の伝播を避けます。近傍の列挙はヒープ確保なし。パレット間色差は先に計算し、各候補は逐次評価してメモリを再利用します。
 
+Autoでは線の中央色・連続性に加え、線幅も元画像と比較します。出力の同色領域を線の両側へ各64セルまで調べ、元画像上の幅へ換算するため、PreserveとLogicalで同じ評価になります。過度に太く／細くなった候補はShapeと境界整合度の加点を下げます。幅のある線には元の幅の25%（整数切り捨て）の境界誤差を許容し、1pxの線には余分な1pxを許容しません。探索上限で両端が不明な場合は確認できた幅による控えめな評価に留めます。
+
 建物向けの保護ボーナス・領域係数・候補評価重みは`core/src/cell.rs`の`ShapeBalance` / `BUILDING`に分離しています。building / character / iconを選ぶプリセットUIは未実装です。新規依存は追加していません。
 
 既存Pixel Art Fixer / Pixel Snapperのコードはコピーしていません。正規グリッドへの再構成とSurface Strict / Edge Strict / Shape Strictを独自実装しています。Autoと外形判定は軽量な近似で、物体の意味理解や元グリッドの厳密復元ではありません。量子化や任意のMedianで既に消えた色・細部は後段では復元できません。1セル内に複数の形がある場合は1セル1色の制約が優先されます。非整数拡大、オフセット、密な植物、意図的な色テクスチャはManual GridやShape強・Median Offでも比較してください。JPEGのEXIF回転・ICC色管理・アニメーションの再生はMVP対象外です。
@@ -93,7 +95,7 @@ cargo run --release --manifest-path core/Cargo.toml --bin pixelstrict -- input.p
 
 `--shape 1|2|3` / JSONの`shape_protection`は省略時2（中）です。既存JSONはそのまま受け付けます。Shape弱も保護を有効にした弱いボーナスで、旧アルゴリズムへ戻すモードではありません。
 
-Reportの`classes`は **[FLAT, EDGE, DETAIL, UNKNOWN, LINE]** の5要素です。先頭4要素の位置を維持して末尾にLINEを追加しました。トップレベルに`silhouette_count`（外形候補セル数）、`preserved_detail_count`（保護色を残した小形状セル数。物体数ではない）、`line_continuity_score`、`shape_score`を追加。各候補の`metrics`にはさらに`silhouette_retention`、`line_continuity_retention`、`small_detail_retention`、`corner_edge_consistency`を出します。保持指標は0〜1で、対象がない項目は1です。`shape_score`はこれらの重み付き指標であり、画質の保証値ではありません。PNGは決定論的ですが、Reportの`processing_ms`は実測時間なので変動します。
+Reportの`classes`は **[FLAT, EDGE, DETAIL, UNKNOWN, LINE]** の5要素です。先頭4要素の位置を維持して末尾にLINEを追加しました。トップレベルに`silhouette_count`（外形候補セル数）、`preserved_detail_count`（保護色を残した小形状セル数。物体数ではない）、`line_continuity_score`、`shape_score`を追加。各候補の`metrics`にはさらに`silhouette_retention`、`line_continuity_retention`、`line_width_retention`、`small_detail_retention`、`corner_edge_consistency`を出します。保持指標は0〜1で、対象がない項目は1です。`shape_score`では線の連続性に線幅保持率を掛けて評価します。画質の保証値ではありません。PNGは決定論的ですが、Reportの`processing_ms`は実測時間なので変動します。
 
 Reportは既存の`source_width` / `source_height` / `grid`等を保持し、`output_mode`、`output_width`、`output_height`、`cell_pitch`を追加します。`cell_pitch`は**出力上の正方形セルの一辺（px）**で、Logicalは常に1です。例: 1254×1254・Grid 418×418なら、Preserveは`output_width=1254, output_height=1254, cell_pitch=3`、Logicalは`output_width=418, output_height=418, cell_pitch=1`です。
 

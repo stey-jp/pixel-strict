@@ -3,6 +3,7 @@
 use crate::{Grid, color::Quantized};
 
 const MAX_PROBES: usize = 16_384;
+const MAX_WIDTH_STEPS: usize = 64;
 
 struct Probe {
     points: [usize; 3],
@@ -10,6 +11,8 @@ struct Probe {
     line: bool,
     silhouette: bool,
     detail: bool,
+    // Source interval along the scan axis, end exclusive (used for lines).
+    span: [usize; 2],
 }
 
 struct Run {
@@ -59,6 +62,7 @@ impl SourceShape {
                             || b.end == length
                             || q.colors[a.label as usize][3] != q.colors[b.label as usize][3],
                         detail: false,
+                        span: [0, 0],
                     });
                 }
                 for triple in runs.windows(3) {
@@ -116,6 +120,7 @@ impl SourceShape {
                             line: true,
                             silhouette: false,
                             detail,
+                            span: [b.start, b.end],
                         });
                     }
                 }
@@ -141,10 +146,11 @@ impl SourceShape {
         }
     }
 
-    // (silhouette retention, line retention, boundary consistency, compact detail retention).
-    pub fn retention(&self, out: &[u8], q: &Quantized, g: Grid, w: usize, h: usize) -> [f64; 4] {
+    // (silhouette, line continuity, boundary consistency, compact detail, line width).
+    pub fn retention(&self, out: &[u8], q: &Quantized, g: Grid, w: usize, h: usize) -> [f64; 5] {
         let mut totals = [0usize; 4];
         let mut kept = [0usize; 4];
+        let mut widths = 0.0;
         for probe in &self.probes {
             let count = if probe.line { 3 } else { 2 };
             let labels = probe.points.map(|p| {
@@ -162,6 +168,9 @@ impl SourceShape {
                     && q.distances[b][labels[i + 1]] <= contrast * 0.25
                     && q.distances[labels[i]][labels[i + 1]] >= contrast * 0.25
             });
+            if probe.line {
+                widths += probe.width_retention(out, q, g, w, h);
+            }
             for (i, enabled) in [probe.silhouette, probe.line, !probe.line, probe.detail]
                 .into_iter()
                 .enumerate()
@@ -172,12 +181,194 @@ impl SourceShape {
                 }
             }
         }
-        std::array::from_fn(|i| {
+        let retention: [f64; 4] = std::array::from_fn(|i| {
             if totals[i] == 0 {
                 1.0
             } else {
                 kept[i] as f64 / totals[i] as f64
             }
-        })
+        });
+        [
+            retention[0],
+            retention[1],
+            retention[2],
+            retention[3],
+            if totals[1] == 0 {
+                1.0
+            } else {
+                widths / totals[1] as f64
+            },
+        ]
+    }
+}
+
+impl Probe {
+    fn width_retention(&self, out: &[u8], q: &Quantized, g: Grid, w: usize, h: usize) -> f64 {
+        let vertical = self.points[0] / w != self.points[1] / w;
+        let p = self.points[1];
+        let x = ((p % w + 1) * g.width as usize - 1) / w;
+        let y = ((p / w + 1) * g.height as usize - 1) / h;
+        let (center, length, count) = if vertical {
+            (y, h, g.height as usize)
+        } else {
+            (x, w, g.width as usize)
+        };
+        let target = self.labels[1] as usize;
+        let tolerance = q.distances[target][self.labels[0] as usize]
+            .min(q.distances[target][self.labels[2] as usize])
+            * 0.25;
+        let matches = |position| {
+            let i = if vertical {
+                position * g.width as usize + x
+            } else {
+                y * g.width as usize + position
+            };
+            q.distances[target][out[i] as usize] <= tolerance
+        };
+        if !matches(center) {
+            return 0.0;
+        }
+        let (mut start, mut end) = (center, center + 1);
+        for _ in 0..MAX_WIDTH_STEPS {
+            if start == 0 || !matches(start - 1) {
+                break;
+            }
+            start -= 1;
+        }
+        for _ in 0..MAX_WIDTH_STEPS {
+            if end == count || !matches(end) {
+                break;
+            }
+            end += 1;
+        }
+        // Compare in source coordinates for both modes, including the unequal
+        // integer source intervals in Logical. No output resampling is needed.
+        let source_width = self.span[1] - self.span[0];
+        let output_width = end * length / count - start * length / count;
+        let open = (start > 0 && matches(start - 1)) || (end < count && matches(end));
+        if open && output_width <= source_width {
+            // At the scan cap only a lower bound is known. Do not invent a
+            // thinning penalty for a wide run whose ends were not reached.
+            return 1.0;
+        }
+        // Allow rounding/noisy boundaries on wider lines; a one-pixel line
+        // must not get a free extra pixel of thickness.
+        let allowance = source_width / 4;
+        ((source_width.min(output_width) + allowance) as f64
+            / source_width.max(output_width) as f64)
+            .min(1.0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{Rgba, RgbaImage};
+
+    #[test]
+    fn width_detects_expansion_and_thinning_with_identical_probe_colors() {
+        for vertical in [false, true] {
+            let (w, h) = if vertical { (12, 24) } else { (24, 12) };
+            let source = RgbaImage::from_fn(w, h, |x, y| {
+                Rgba(if (9..11).contains(&if vertical { y } else { x }) {
+                    [24, 28, 32, 255]
+                } else {
+                    [200, 184, 160, 255]
+                })
+            });
+            let q = crate::color::quantize(&source, Some(16));
+            let shape = SourceShape::new(&q, w as usize, h as usize);
+            let target = q.labels[if vertical { 9 * w as usize } else { 9 }];
+            let background = q.labels[0];
+            for (span, expected) in [(9..11, 1.0), (8..12, 0.5), (9..10, 0.5)] {
+                let out: Vec<_> = (0..q.labels.len())
+                    .map(|i| {
+                        let coordinate = if vertical {
+                            i / w as usize
+                        } else {
+                            i % w as usize
+                        };
+                        if span.contains(&coordinate) {
+                            target
+                        } else {
+                            background
+                        }
+                    })
+                    .collect();
+                let metrics = shape.retention(
+                    &out,
+                    &q,
+                    Grid {
+                        width: w,
+                        height: h,
+                    },
+                    w as usize,
+                    h as usize,
+                );
+                // Center/background checks alone accept every one of these.
+                assert_eq!(metrics[1], 1.0);
+                assert_eq!(metrics[4], expected);
+            }
+            let missing = vec![background; q.labels.len()];
+            assert_eq!(
+                shape.retention(
+                    &missing,
+                    &q,
+                    Grid {
+                        width: w,
+                        height: h
+                    },
+                    w as usize,
+                    h as usize
+                )[4],
+                0.0
+            );
+        }
+    }
+
+    #[test]
+    fn width_uses_non_divisible_logical_intervals_on_both_axes() {
+        for vertical in [false, true] {
+            let (w, h, g) = if vertical {
+                (
+                    7,
+                    11,
+                    Grid {
+                        width: 2,
+                        height: 4,
+                    },
+                )
+            } else {
+                (
+                    11,
+                    7,
+                    Grid {
+                        width: 4,
+                        height: 2,
+                    },
+                )
+            };
+            let source = RgbaImage::from_fn(w, h, |x, y| {
+                Rgba(if (5..8).contains(&if vertical { y } else { x }) {
+                    [24, 28, 32, 255]
+                } else {
+                    [0, 0, 0, 0]
+                })
+            });
+            let q = crate::color::quantize(&source, Some(16));
+            let shape = SourceShape::new(&q, w as usize, h as usize);
+            let target = q.labels[if vertical { 5 * w as usize } else { 5 }];
+            let out: Vec<_> = (0..g.width * g.height)
+                .map(|i| {
+                    if (if vertical { i / g.width } else { i % g.width }) == 2 {
+                        target
+                    } else {
+                        q.labels[0]
+                    }
+                })
+                .collect();
+            // The third cell covers [5, 8), not a rounded uniform 11/4 pitch.
+            assert_eq!(shape.retention(&out, &q, g, w as usize, h as usize)[4], 1.0);
+        }
     }
 }

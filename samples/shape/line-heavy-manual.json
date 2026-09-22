@@ -50,6 +50,7 @@
         "preserved_detail_count": 0,
         "silhouette_retention": 1.0,
         "line_continuity_retention": 1.0,
+        "line_width_retention": 1.0,
         "small_detail_retention": 1.0,
         "corner_edge_consistency": 1.0,
         "shape_score": 0.9999999999999999,
@@ -57,7 +58,7 @@
       }
     }
   ],
-  "processing_ms": 1.5143000000000002,
+  "processing_ms": 1.5943,
   "options": {
     "output_mode": "preserve",
     "grid_width": 48,

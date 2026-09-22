@@ -1,5 +1,28 @@
 # 検証結果
 
+## Auto Gridの線幅保護（2026-09-23、Shape protection追加後）
+
+線の中心と背景が残っていれば、線が太くなっても連続性の保持と判定されていた問題を修正。既存の元画像プローブに線幅を記録し、候補の実出力と元画像座標で比較する`line_width_retention`を追加しました。shape scoreの線項目とalignment加点に反映し、分類・色決定・描画・C ABI・設定UIは変更していません。新規依存なし。
+
+- `line-heavy`のAutoは**12×12セル（P=4）→48×48セル（P=1）**。1px線の太さと位置を保持し、参照と異なる画素数は566→0。1/2/4倍、斜線の向き違い、Preserve / Logicalの両方を全画素比較しています。
+- Preserveは元寸法・整数セル・単色矩形を維持。Logicalは元画像上の整数区間で幅を評価し、非整除の横長／縦長入力でも座標対応を確認。補間・anti-aliasingは追加していません。
+- 既存houseのAutoは32×32・11色、Manualは弱24色／強20色。3種類のPNGは直前版`672740c`とバイト単位で一致。building-like / flat-with-noiseとManualの線fixtureもPNGは不変。JSON reportと比較資料を再生成しました。
+- `cargo test --release --locked --manifest-path core/Cargo.toml`: **31件成功**。追加3件は線幅の拡大／縮小／消失、非整除座標、Autoの幅と位置。既存の外形・細線・小形状・単独ノイズ・単色セル・両出力モード・決定論性の回帰も成功。
+- `cargo clippy --release --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings`、`cargo fmt --manifest-path core/Cargo.toml --check`、`flutter analyze --no-pub`: **成功、指摘なし**。
+- Windows FFI統合テストと`flutter build windows --release --no-pub`: **成功**。全候補の追加JSON指標を読み取り、preview・保存・設定変更後の再変換を確認。Release同梱DLLを直接C ABIで呼び、Autoの採用グリッド・追加指標・生成PNGが最新fixtureと一致することも検証。
+
+旧／新のWindows Release同梱DLLを同じプロセスでwarm-up後に各5回、実行順を交互にして計測した中央値（decode〜PNG encode）:
+
+| 入力・設定 | 直前版`672740c` | 線幅保護追加後 |
+| --- | ---: | ---: |
+| 192×192・Auto Logical | 40.4ms | 40.0ms |
+| 1254×1254・Auto Logical | 152.6ms | 148.8ms |
+| 1254×1254・Preserve Grid 418・Colors 24・Smoothing 3 | 209.6ms | 209.2ms |
+
+入力は同じhouse画像で、1254版はNearest Neighborによる拡大。この範囲で目立つ追加コストはなく、差はローカル計測の変動範囲です。先のShape protection全体による元MVP比のコスト増は引き続き存在します。
+
+線幅探索は各方向64セルまでで、広い線の端が上限内に見つからない場合は過剰な細線化ペナルティを避ける近似です。太い線の境界には元幅の25%（整数切り捨て）の許容差を設け、1px線は太さの増加を許容しません。接触・交差した線、量子化前に失われる低コントラスト細部、候補集合にないグリッドは今後の課題です。実際の建物画像での評価、Android / macOS / iOSの再ビルド・実機検証は未実施。以下は各変更時点の履歴で、直下のline-heavyの線幅制限は今回改善済みです。
+
 ## Shape protection追加（2026-09-23）
 
 Windows 11 x64 / Flutter 3.47.0 / Dart 3.13.0 / Rust 1.97.1。Rust core中心の変更で、依存追加なし。preprocess → quantize → grid candidate → analyze → decide → evaluate、C ABI、両出力モードを維持しています。以下より下の記録は各変更時点の履歴です。

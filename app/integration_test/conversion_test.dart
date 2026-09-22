@@ -154,6 +154,12 @@ void main() {
       expect(a.report['classes'], hasLength(5));
       expect(a.report['silhouette_count'], greaterThan(0));
       expect(a.report['shape_score'], inInclusiveRange(0, 1));
+      for (final candidate in a.report['candidates'] as List) {
+        expect(
+          candidate['metrics']['line_width_retention'],
+          inInclusiveRange(0, 1),
+        );
+      }
       final protected = await convertImage(
         source,
         const ConversionSettings(gridWidth: 32, shapeProtection: 3),

@@ -167,6 +167,58 @@ fn auto_scores_source_shapes_even_when_coarse_candidates_lose_them() {
 }
 
 #[test]
+fn auto_preserves_line_width_and_position_at_multiple_scales() {
+    for reference in [
+        shapes::line_heavy(),
+        image::imageops::flip_vertical(&shapes::line_heavy()),
+    ] {
+        for scale in [1, 2, 4] {
+            let source = image::imageops::resize(
+                &reference,
+                48 * scale,
+                48 * scale,
+                image::imageops::FilterType::Nearest,
+            );
+            let bytes = encode(&source);
+            for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+                let result = convert(
+                    &bytes,
+                    &Options {
+                        grid_width: None,
+                        output_mode,
+                        ..settings(48)
+                    },
+                )
+                .unwrap();
+                let expected = if output_mode == OutputMode::Preserve {
+                    &source
+                } else {
+                    &reference
+                };
+                let output = decoded(&result.png);
+                assert_eq!(
+                    result.report.candidates[0].metrics.line_width_retention,
+                    1.0
+                );
+                assert_eq!(
+                    output.dimensions(),
+                    expected.dimensions(),
+                    "scale {scale}, {output_mode:?}"
+                );
+                for (x, y, pixel) in expected.enumerate_pixels() {
+                    assert_eq!(
+                        output.get_pixel(x, y),
+                        pixel,
+                        "line width/position changed at ({x}, {y}), scale {scale}, {output_mode:?}, grid {:?}",
+                        result.report.grid
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn building_and_noise_fixtures_keep_structure_without_surface_speckles() {
     for source in [shapes::building_like(), shapes::flat_with_noise()] {
         let out = decoded(&convert(&encode(&source), &settings(48)).unwrap().png);

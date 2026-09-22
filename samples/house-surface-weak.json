@@ -165,7 +165,7 @@
   "silhouette_count": 209,
   "preserved_detail_count": 43,
   "line_continuity_score": 0.0028691058777803296,
-  "shape_score": 0.46823020093838724,
+  "shape_score": 0.4673965852226316,
   "candidates": [
     {
       "grid": {
@@ -182,14 +182,15 @@
         "preserved_detail_count": 43,
         "silhouette_retention": 0.9943502824858758,
         "line_continuity_retention": 0.0028691058777803296,
+        "line_width_retention": 0.031503481959907105,
         "small_detail_retention": 0.012987012987012988,
         "corner_edge_consistency": 0.7783297847172936,
-        "shape_score": 0.46823020093838724,
-        "score": 0.5620924105295778
+        "shape_score": 0.4673965852226316,
+        "score": 0.5610503908848833
       }
     }
   ],
-  "processing_ms": 3.6197,
+  "processing_ms": 4.1568000000000005,
   "options": {
     "output_mode": "logical",
     "grid_width": 32,

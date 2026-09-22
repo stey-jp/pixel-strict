@@ -66,6 +66,15 @@ fn cli_output_modes_reports_and_errors() {
         assert_eq!(json["classes"].as_array().unwrap().len(), 5);
         assert!(json["silhouette_count"].as_u64().unwrap() > 0);
         assert!((0.0..=1.0).contains(&json["shape_score"].as_f64().unwrap()));
+        for candidate in json["candidates"].as_array().unwrap() {
+            assert!(
+                (0.0..=1.0).contains(
+                    &candidate["metrics"]["line_width_retention"]
+                        .as_f64()
+                        .unwrap()
+                )
+            );
+        }
         assert_eq!(json["output_height"], dimension);
         assert_eq!(json["grid"]["width"], 32);
         assert_eq!(json["cell_pitch"], if mode == "logical" { 1 } else { 6 });
