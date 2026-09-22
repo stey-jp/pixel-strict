@@ -222,6 +222,9 @@ fn auto_preserve_selects_only_equal_integer_square_cells() {
 #[test]
 fn logical_pngs_match_existing_regression_samples_byte_for_byte() {
     let bytes = include_bytes!("../../samples/house-pseudo.png");
+    let reference = image::load_from_memory(include_bytes!("../../samples/house-reference.png"))
+        .unwrap()
+        .to_rgba8();
     for (width, colors, smoothing, png) in [
         (
             None,
@@ -254,6 +257,15 @@ fn logical_pngs_match_existing_regression_samples_byte_for_byte() {
         )
         .unwrap();
         assert_eq!(result.png, png);
+        // Shape improvements intentionally update the PNG goldens, but must
+        // remain close to the independent known-grid reference as well.
+        let image = image::load_from_memory(&result.png).unwrap().to_rgba8();
+        let error: u64 = image
+            .pixels()
+            .zip(reference.pixels())
+            .map(|(a, b)| (0..3).map(|c| a[c].abs_diff(b[c]) as u64).sum::<u64>())
+            .sum();
+        assert!(error as f64 / (32.0 * 32.0 * 3.0) < 3.5);
         assert_eq!(
             (result.report.output_width, result.report.output_height),
             (32, 32)
@@ -280,6 +292,10 @@ fn ffi_old_json_defaults_to_preserve_and_returns_additive_report_fields() {
         assert_eq!(report["output_height"], 96);
         assert_eq!(report["cell_pitch"], 3);
         assert_eq!(report["grid"]["width"], 32);
+        assert_eq!(report["options"]["shape_protection"], 2);
+        assert_eq!(report["classes"].as_array().unwrap().len(), 5);
+        assert!(report["silhouette_count"].as_u64().unwrap() > 0);
+        assert!((0.0..=1.0).contains(&report["shape_score"].as_f64().unwrap()));
         let png = std::slice::from_raw_parts(ps_result_png(result), ps_result_png_len(result));
         assert_eq!(
             image::load_from_memory(png)

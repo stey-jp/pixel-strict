@@ -2,7 +2,7 @@
 
 AI生成の疑似ピクセルアートを、整数グリッド・1セル1色のPNGへ再構成するローカルアプリです。Flutter UI / Rust core / C ABI FFI。OpenAI API・画像生成・OpenCVは使用しません。
 
-Preserve対応のWindows Releaseは`flutter build windows --release`で生成する`app/build/windows/x64/runner/Release/`です。初回MVPのビルド: `output/PixelStrict-windows-x64.zip`、`output/PixelStrict-android-arm64-debug.apk`（今回未更新）。[検証結果](VALIDATION.md)と[比較画像](samples/comparison.png)も参照してください。Windows配布時はexe単体ではなくDLL・dataを含むReleaseフォルダー全体が必要です。
+Shape protection / Preserve対応のWindows Releaseは`flutter build windows --release`で生成する`app/build/windows/x64/runner/Release/`です。初回MVPのビルド: `output/PixelStrict-windows-x64.zip`、`output/PixelStrict-android-arm64-debug.apk`（今回未更新）。[検証結果](VALIDATION.md)と[比較画像](samples/comparison.png)も参照してください。Windows配布時はexe単体ではなくDLL・dataを含むReleaseフォルダー全体が必要です。
 
 ## 構成
 
@@ -44,7 +44,7 @@ Developer Modeが無効でプラグインリンクの作成に失敗する場合
 2. Output: **Preserve size（デフォルト）**、またはLogical pixelsを選択。
 3. Grid: Auto、またはManualで**Grid width（横方向のセル数）**を指定。Preserveでは元画像の両辺を割り切る均等な正方形整数セルのみ使用し、Manualには`418 cells / 3px`のように表示します。Logicalでは従来どおり高さを縦横比から整数に丸めます。
 4. Colors: Auto / 16 / 24 / 32。指定数は透明色を含む上限で、不要な色は追加しません。
-5. Surface smoothing / Edge protectionを弱・中・強から選択。MedianはOff / 半径1px。
+5. Surface smoothing / Edge protection / **Shape protection**を弱・中・強から選択（初期値は中）。Shapeは外形・細線・小形状の保持を調整します。MedianはOff / 半径1px。
 6. 変換後、Before / Afterを比較してPNGを保存。片方をズーム／パンすると、もう片方も同じ倍率・位置に同期します。変換・再変換時は表示位置を保持し、新しい画像を読み込むと全体表示に戻ります。プレビューの拡大表示はNearest Neighborのみ。
 
 保存PNGは次の2モードから選択できます。
@@ -65,22 +65,24 @@ Preserveでは`source_width % P == 0`かつ`source_height % P == 0`が必須で�
 3. RGB各5bitの重み付きヒストグラムをOKLabへ変換。決定的なfarthest-point初期化＋8回のweighted k-meansで減色。ditheringなし。
 4. 元画像からセル候補を生成。Preserveは`gcd(width, height)`の全約数を整数pixel pitch候補とし、均等な正方形セルとモード別セル数上限を満たす候補のみ使用します。Logicalは従来どおり非整除寸法も整数区間へ分割。どちらも全入力画素を1回ずつ所属させます。
 5. 微小な色ノイズを抑えた横・縦のOKLab色差投影から境界整合度を求め、上位8候補＋可能なら原寸候補を精査。境界付近の±1pxを評価し、非整数拡大による位置の丸めを許容します。
-6. セル内占有率、近似色の合計占有率、色ごとの空間共分散、周囲8セルのコントラストからFLAT / EDGE / DETAIL / UNKNOWNに分類。
-7. `占有率 + 周囲の連続性 + 方向に沿う連続性 − 孤立ペナルティ − 不要な色差`で最終色を決定。方向は水平・垂直・2斜線の正負8方向。連続線は少数派色も候補に残します。DETAILでは面統合を弱め、UNKNOWNは保守的に判定。
-8. FLATを起点に同一面の近似色を再統合。固定seedとの色差で制限し、段階的に異なる面へ色が伝播する連鎖を防ぎます。輪郭セルは同じ面の色が88%以上を占める場合のみ統合対象。
-9. 面均一性、エッジ連続性、孤立画素数、量子化後の入力との差、境界整合度と過剰な細分化への小さなペナルティを比較し候補を採用。全候補の内訳はCLIのJSON reportに出力。
+6. 占有率・空間共分散・周囲8セルからFLAT / EDGE / DETAIL / UNKNOWN / **LINE**に分類。透明境界と外周につながる面の高コントラスト境界をsilhouette候補にします。1〜2セル幅の線・斜線・端点・曲がり角をLINEとして保護。近似色をまとめた8連結成分で2〜6セルの小形状を保護し、セル内の高コントラストな少数派色も連結性を確認します。
+7. `占有率 + 周囲／エッジの連続性 + LINE／silhouette／小形状ボーナス − 孤立ペナルティ − 不要な色差`で決定。ユーザーのsmoothingにFLAT=1、EDGE=0.10、LINE=0.025、DETAIL=0.035、UNKNOWN=0.10、silhouette=0.015の領域係数を掛けます。単独の近似色ノイズは面へ統合します。
+8. FLATを起点に固定seedとの色差を制限して面を再統合。LINEと小形状を多数決で消しません。silhouetteを統合の起点にせず、同じ面へ吸収できる色差も通常の20%までに制限します。透明／不透明や高コントラストな外形は統合できません。
+9. 従来の面均一性・入力誤差・境界整合度に、外形保持・出力上の線の接続・小形状保持・角／境界整合性を追加。全候補で共通の元画像プローブ（最大16,384件）を参照するため、粗い候補でLINEや小形状の検出数がゼロになっても無条件に高得点にはなりません。形状の保持率が低い場合は境界整合度の加点も下げます。細分化コストは横セル数が2倍になるごとに加算し、拡大された入力で不要なセル分割を優遇しません。
 10. 新規RGBAバッファへ決定済みセル色を直接描画しPNG encode。Preserveは元画像サイズへ1セル`P×P`画素、Logicalはグリッドサイズへ1セル1画素。アンチエイリアス、補間、半透明境界、サブピクセル座標は発生しません。
 
 セル判定は元の配列を参照する二重バッファ方式で、処理順による色の伝播を避けます。近傍の列挙はヒープ確保なし。パレット間色差は先に計算し、各候補は逐次評価してメモリを再利用します。
 
-既存Pixel Art Fixer / Pixel Snapperのコードはコピーしていません。元グリッドを厳密復元する方式ではなく、正規グリッドへの再構成とSurface Strict / Edge Strictを独自実装しています。Autoはヒューリスティックであり、元解像度の正解を保証しません。非整数拡大、オフセット、意図的な色テクスチャ、1セル内の極小ディテールは手動Gridと弱い平滑化で比較してください。JPEGのEXIF回転・ICC色管理・アニメーションの再生はMVP対象外です。
+建物向けの保護ボーナス・領域係数・候補評価重みは`core/src/cell.rs`の`ShapeBalance` / `BUILDING`に分離しています。building / character / iconを選ぶプリセットUIは未実装です。新規依存は追加していません。
+
+既存Pixel Art Fixer / Pixel Snapperのコードはコピーしていません。正規グリッドへの再構成とSurface Strict / Edge Strict / Shape Strictを独自実装しています。Autoと外形判定は軽量な近似で、物体の意味理解や元グリッドの厳密復元ではありません。量子化や任意のMedianで既に消えた色・細部は後段では復元できません。1セル内に複数の形がある場合は1セル1色の制約が優先されます。非整数拡大、オフセット、密な植物、意図的な色テクスチャはManual GridやShape強・Median Offでも比較してください。JPEGのEXIF回転・ICC色管理・アニメーションの再生はMVP対象外です。
 
 ## Rust CLI
 
 Flutterなしで実行できます。入力／出力パスは日本語・空白に対応。既存ファイルは上書きしません。
 
 ```powershell
-cargo run --release --manifest-path core/Cargo.toml --bin pixelstrict -- samples/house-pseudo.png output.png --grid auto --output preserve --colors 24 --smoothing 3 --edge 2 --report report.json
+cargo run --release --manifest-path core/Cargo.toml --bin pixelstrict -- samples/house-pseudo.png output.png --grid auto --output preserve --colors 24 --smoothing 3 --edge 2 --shape 2 --report report.json
 # 手動Grid（1254×1254入力なら3pxセル）
 cargo run --release --manifest-path core/Cargo.toml --bin pixelstrict -- input.png strict.png --grid 418 --output preserve --colors 16 --median
 # 従来の論理ピクセル原寸出力
@@ -88,6 +90,10 @@ cargo run --release --manifest-path core/Cargo.toml --bin pixelstrict -- input.p
 ```
 
 `--output preserve|logical`は省略時`preserve`です。FFIのOptions JSONも`"output_mode":"preserve"` / `"logical"`を受け付け、旧JSONのように未指定ならPreserveになります。C ABIの関数・所有権は変更していません。
+
+`--shape 1|2|3` / JSONの`shape_protection`は省略時2（中）です。既存JSONはそのまま受け付けます。Shape弱も保護を有効にした弱いボーナスで、旧アルゴリズムへ戻すモードではありません。
+
+Reportの`classes`は **[FLAT, EDGE, DETAIL, UNKNOWN, LINE]** の5要素です。先頭4要素の位置を維持して末尾にLINEを追加しました。トップレベルに`silhouette_count`（外形候補セル数）、`preserved_detail_count`（保護色を残した小形状セル数。物体数ではない）、`line_continuity_score`、`shape_score`を追加。各候補の`metrics`にはさらに`silhouette_retention`、`line_continuity_retention`、`small_detail_retention`、`corner_edge_consistency`を出します。保持指標は0〜1で、対象がない項目は1です。`shape_score`はこれらの重み付き指標であり、画質の保証値ではありません。PNGは決定論的ですが、Reportの`processing_ms`は実測時間なので変動します。
 
 Reportは既存の`source_width` / `source_height` / `grid`等を保持し、`output_mode`、`output_width`、`output_height`、`cell_pitch`を追加します。`cell_pitch`は**出力上の正方形セルの一辺（px）**で、Logicalは常に1です。例: 1254×1254・Grid 418×418なら、Preserveは`output_width=1254, output_height=1254, cell_pitch=3`、Logicalは`output_width=418, output_height=418, cell_pitch=1`です。
 
@@ -99,6 +105,7 @@ Reportは既存の`source_width` / `source_height` / `grid`等を保持し、`ou
 cargo test --locked --manifest-path core/Cargo.toml
 cargo clippy --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings
 cargo run --release --locked --manifest-path core/Cargo.toml --example samples -- samples
+cargo run --release --locked --manifest-path core/Cargo.toml --example shape_samples -- samples/shape
 python scripts/compare_samples.py  # Pillow 13以降。アプリ実行には不要
 cd app
 flutter analyze --no-pub
@@ -107,6 +114,8 @@ flutter test integration_test/conversion_test.dart -d windows --no-pub --dart-de
 ```
 
 合成サンプルは実際のAI生成画像ではなく、正解グリッドが既知の画像に色ノイズ・境界混色を加えた制御実験です。`samples/comparison.png`は参照／入力／Auto／平滑化弱／強の比較、`samples/comparison.json`は色数・RGB誤差・処理時間です。時間はマシンと実行条件で変動します。実際のAI画像に対する広範な品質保証、異なるCPU間の浮動小数点演算を含むバイト一致は未検証です。
+
+形の保護の再現用fixtureは[`samples/shape`](samples/shape/README.md)にあります。旧版との比較では、同じ解像度・強いsmoothingで消えていた低コントラストの窓枠・縁と小形状を保持し、単独ノイズの除去を維持しています。
 
 ネイティブアプリのためWeb用PSI／Lighthouse／Chrome DevTools Issues監査の対象URLはありません。代わりにRust回帰テスト、Dart静的解析、画面サイズ別widgetテスト、Windows FFI統合テストと実画面確認を実施します。
 

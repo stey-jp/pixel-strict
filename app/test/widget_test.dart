@@ -12,6 +12,15 @@ void main() {
         await tester.pumpWidget(const PixelStrictApp());
         await tester.pump();
         expect(find.text('PixelStrict'), findsOneWidget);
+        final shape = find.descendant(
+          of: find.byKey(const Key('shapeProtection')),
+          matching: find.byType(SegmentedButton<int>),
+        );
+        expect(tester.widget<SegmentedButton<int>>(shape).selected, {2});
+        await tester.ensureVisible(shape);
+        await tester.tap(find.descendant(of: shape, matching: find.text('強')));
+        await tester.pumpAndSettle();
+        expect(tester.widget<SegmentedButton<int>>(shape).selected, {3});
         final output = find.byKey(const Key('outputMode'));
         expect(
           tester

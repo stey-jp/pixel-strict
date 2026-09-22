@@ -2,6 +2,7 @@ mod cell;
 mod color;
 pub mod ffi;
 pub mod grid;
+mod shape;
 
 pub use cell::{Class, Metrics};
 pub use grid::Grid;
@@ -30,6 +31,7 @@ pub struct Options {
     pub colors: Option<u8>,
     pub smoothing: u8,
     pub edge_protection: u8,
+    pub shape_protection: u8,
     pub median: bool,
 }
 impl Default for Options {
@@ -40,6 +42,7 @@ impl Default for Options {
             colors: None,
             smoothing: 2,
             edge_protection: 2,
+            shape_protection: 2,
             median: false,
         }
     }
@@ -56,7 +59,10 @@ impl Options {
         if !matches!(self.colors, None | Some(16 | 24 | 32)) {
             return Err("Colors must be Auto, 16, 24 or 32".into());
         }
-        if !(1..=3).contains(&self.smoothing) || !(1..=3).contains(&self.edge_protection) {
+        if !(1..=3).contains(&self.smoothing)
+            || !(1..=3).contains(&self.edge_protection)
+            || !(1..=3).contains(&self.shape_protection)
+        {
             return Err("Strength must be 1, 2 or 3".into());
         }
         if let Some(n) = self.grid_width {
@@ -97,7 +103,12 @@ pub struct Report {
     /// Side length of each rendered square cell in output pixels (1 for Logical).
     pub cell_pitch: u32,
     pub palette: Vec<[u8; 4]>,
-    pub classes: [usize; 4],
+    /// FLAT, EDGE, DETAIL, UNKNOWN, LINE (old indices remain unchanged).
+    pub classes: [usize; 5],
+    pub silhouette_count: usize,
+    pub preserved_detail_count: usize,
+    pub line_continuity_score: f64,
+    pub shape_score: f64,
     pub candidates: Vec<CandidateReport>,
     pub processing_ms: f64,
     pub options: Options,
@@ -185,6 +196,7 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
     let q = color::quantize(&decoded, options.colors);
     drop(decoded);
     let (xp, yp) = grid::profiles(&q, w as usize, h as usize);
+    let source_shape = shape::SourceShape::new(&q, w as usize, h as usize);
     let mut grids = if let Some(g) = manual_grid {
         vec![g]
     } else {
@@ -217,7 +229,7 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
         return Err("No valid grid candidates within the cell limit; try Logical output".into());
     }
     let mut reports = Vec::new();
-    let mut best: Option<(f64, Grid, Vec<u8>, [usize; 4])> = None;
+    let mut best: Option<(f64, Grid, Vec<u8>, [usize; 5])> = None;
     for g in grids.drain(..) {
         let cells = cell::analyze(&q, w as usize, h as usize, g);
         let out = cell::decide(&cells, &q, g, options);
@@ -229,18 +241,20 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
             grid::alignment(g, &xp, &yp),
             w as usize,
             h as usize,
+            &source_shape,
         );
         let score = metrics.score;
         if best.as_ref().is_none_or(|b| {
             score > b.0 + 1e-9 || ((score - b.0).abs() <= 1e-9 && g.width > b.1.width)
         }) {
-            let mut classes = [0; 4];
+            let mut classes = [0; 5];
             for c in &cells {
                 classes[match c.class {
                     Class::Flat => 0,
                     Class::Edge => 1,
                     Class::Detail => 2,
                     Class::Unknown => 3,
+                    Class::Line => 4,
                 }] += 1;
             }
             best = Some((score, g, out, classes));
@@ -254,6 +268,11 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
             .then_with(|| b.grid.width.cmp(&a.grid.width))
     });
     let (_, grid, out, classes) = best.unwrap();
+    let selected = &reports.iter().find(|r| r.grid == grid).unwrap().metrics;
+    let silhouette_count = selected.silhouette_count;
+    let preserved_detail_count = selected.preserved_detail_count;
+    let line_continuity_score = selected.line_continuity_retention;
+    let shape_score = selected.shape_score;
     let (output_width, output_height, cell_pitch) = match options.output_mode {
         OutputMode::Preserve => (w, h, w / grid.width),
         OutputMode::Logical => (grid.width, grid.height, 1),
@@ -299,6 +318,10 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
             cell_pitch,
             palette,
             classes,
+            silhouette_count,
+            preserved_detail_count,
+            line_continuity_score,
+            shape_score,
             candidates: reports,
             processing_ms: start.elapsed().as_secs_f64() * 1000.0,
             options: options.clone(),

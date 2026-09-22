@@ -16,6 +16,7 @@ class ConversionSettings {
     this.colors,
     this.smoothing = 2,
     this.edgeProtection = 2,
+    this.shapeProtection = 2,
     this.median = false,
   });
   final OutputMode outputMode;
@@ -23,6 +24,7 @@ class ConversionSettings {
   final int? colors;
   final int smoothing;
   final int edgeProtection;
+  final int shapeProtection;
   final bool median;
   Map<String, Object?> toJson() => {
     'output_mode': outputMode.name,
@@ -30,6 +32,7 @@ class ConversionSettings {
     'colors': colors,
     'smoothing': smoothing,
     'edge_protection': edgeProtection,
+    'shape_protection': shapeProtection,
     'median': median,
   };
 }

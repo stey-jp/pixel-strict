@@ -17,6 +17,7 @@ fn cli_output_modes_reports_and_errors() {
     let help = Command::new(binary).arg("--help").output().unwrap();
     assert!(help.status.success());
     assert!(String::from_utf8_lossy(&help.stdout).contains("--output preserve|logical"));
+    assert!(String::from_utf8_lossy(&help.stdout).contains("--shape 1|2|3"));
     for (mode, dimension) in [("default", 192), ("preserve", 192), ("logical", 32)] {
         let output = temp.join(format!("{mode}.png"));
         let report = temp.join(format!("{mode}.json"));
@@ -33,6 +34,8 @@ fn cli_output_modes_reports_and_errors() {
                 "--edge",
                 "2",
                 "--median",
+                "--shape",
+                "3",
                 "--report",
             ])
             .arg(&report);
@@ -59,6 +62,10 @@ fn cli_output_modes_reports_and_errors() {
             }
         );
         assert_eq!(json["output_width"], dimension);
+        assert_eq!(json["options"]["shape_protection"], 3);
+        assert_eq!(json["classes"].as_array().unwrap().len(), 5);
+        assert!(json["silhouette_count"].as_u64().unwrap() > 0);
+        assert!((0.0..=1.0).contains(&json["shape_score"].as_f64().unwrap()));
         assert_eq!(json["output_height"], dimension);
         assert_eq!(json["grid"]["width"], 32);
         assert_eq!(json["cell_pitch"], if mode == "logical" { 1 } else { 6 });
@@ -72,6 +79,9 @@ fn cli_output_modes_reports_and_errors() {
     for args in [
         vec!["--output", "invalid"],
         vec!["--output"],
+        vec!["--shape", "0"],
+        vec!["--shape", "4"],
+        vec!["--shape"],
         vec!["--grid", "31", "--output", "preserve"],
     ] {
         let result = Command::new(binary)

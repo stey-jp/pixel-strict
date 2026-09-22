@@ -1,0 +1,70 @@
+{
+  "source_width": 48,
+  "source_height": 48,
+  "grid": {
+    "width": 48,
+    "height": 48
+  },
+  "output_mode": "preserve",
+  "output_width": 48,
+  "output_height": 48,
+  "cell_pitch": 1,
+  "palette": [
+    [
+      200,
+      184,
+      160,
+      255
+    ],
+    [
+      24,
+      28,
+      32,
+      255
+    ]
+  ],
+  "classes": [
+    1639,
+    321,
+    0,
+    0,
+    344
+  ],
+  "silhouette_count": 540,
+  "preserved_detail_count": 0,
+  "line_continuity_score": 1.0,
+  "shape_score": 0.9999999999999999,
+  "candidates": [
+    {
+      "grid": {
+        "width": 48,
+        "height": 48
+      },
+      "metrics": {
+        "surface_uniformity": 1.0,
+        "edge_continuity": 1.0,
+        "isolated_pixels": 0,
+        "source_error": 0.0,
+        "grid_alignment": 0.0,
+        "silhouette_count": 540,
+        "preserved_detail_count": 0,
+        "silhouette_retention": 1.0,
+        "line_continuity_retention": 1.0,
+        "small_detail_retention": 1.0,
+        "corner_edge_consistency": 1.0,
+        "shape_score": 0.9999999999999999,
+        "score": 1.153202999942307
+      }
+    }
+  ],
+  "processing_ms": 1.5143000000000002,
+  "options": {
+    "output_mode": "preserve",
+    "grid_width": 48,
+    "colors": 32,
+    "smoothing": 3,
+    "edge_protection": 2,
+    "shape_protection": 2,
+    "median": false
+  }
+}

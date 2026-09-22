@@ -150,6 +150,16 @@ void main() {
       expect(a.gridHeight, 32);
       expect(a.cellPitch, 6);
       expect(a.report['output_mode'], 'preserve');
+      expect(a.report['options']['shape_protection'], 2);
+      expect(a.report['classes'], hasLength(5));
+      expect(a.report['silhouette_count'], greaterThan(0));
+      expect(a.report['shape_score'], inInclusiveRange(0, 1));
+      final protected = await convertImage(
+        source,
+        const ConversionSettings(gridWidth: 32, shapeProtection: 3),
+      );
+      expect(protected.report['options']['shape_protection'], 3);
+      await expectPngSize(protected.png, 192, 192);
       await expectPngSize(a.png, a.width, a.height);
       expect(a.png, orderedEquals(b.png));
       final logical = await convertImage(
@@ -174,6 +184,17 @@ void main() {
         await temp.delete(recursive: true);
       }
       final beforeModeChange = viewController.value.clone();
+      final shape = find.byKey(const Key('shapeProtection'));
+      await tester.ensureVisible(shape);
+      await tester.tap(find.descendant(of: shape, matching: find.text('強')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('resultInfo')), findsNothing);
+      expect(
+        tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,
+        isNull,
+      );
+      await convert();
+      expect(viewController.value.storage, orderedEquals(beforeModeChange.storage));
       final output = find.byKey(const Key('outputMode'));
       await tester.ensureVisible(output);
       await tester.tap(output);

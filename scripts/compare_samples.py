@@ -24,5 +24,5 @@ for i, name in enumerate(names):
         summary[name] = {"rgb_mae": round(error, 3), "colors": colors, "ms": round(report["processing_ms"], 2), "grid": report["grid"]}
         draw.text((i * 320 + 16, 368), f"RGB MAE {error:.2f} / {report['processing_ms']:.1f} ms", fill="#acb8b1")
 canvas.save(samples / "comparison.png")
-(samples / "comparison.json").write_text(json.dumps(summary, indent=2) + "\n")
+(samples / "comparison.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n")
 print(json.dumps(summary, indent=2))

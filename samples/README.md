@@ -2,14 +2,16 @@
 
 `house-reference.png`は32×32の手続き的な参照画像です。`house-pseudo.png`は6倍拡大に色ノイズと境界の混色を加えた192×192画像です。外部画像・画像生成APIは使用していません。
 
-- `house-auto.png`: Grid / ColorsはAuto、smoothing/edgeは中。
+- `house-auto.png`: Grid / ColorsはAuto、smoothing/edge/shapeは中。
 - `house-surface-weak.png`: Grid 32、Colors 32、smoothing弱。
 - `house-surface-strong.png`: Grid 32、Colors 32、smoothing強。
 - 各JSON: 設定・分類件数・候補評価・処理時間。
 - `comparison.png`: Nearest Neighborで拡大した横並び比較。
 - `comparison.json`: 参照とのRGB絶対誤差、色数、処理時間。
 
-比較用の生成スクリプトはLogical Resolutionを明示し、従来の32×32参照画像と同じ寸法を保ちます。アプリ・CLIのデフォルトはPreserve Resolutionです。既存のPNG・JSONは導入前の比較記録として保持しています。
+比較用の生成スクリプトはLogical Resolutionを明示し、従来の32×32参照画像と同じ寸法を保ちます。アプリ・CLIのデフォルトはPreserve Resolutionです。PNG・JSONは2026-09-23のShape改善後に再生成しました。導入前の記録はGitの`9f081f1`から取得できます。全設定でShapeは中です。
+
+低コントラストの縁・小形状・単独ノイズを分離したfixtureと旧版比較は[`shape/README.md`](shape/README.md)を参照してください。
 
 ```powershell
 cargo run --release --locked --manifest-path core/Cargo.toml --example samples -- samples

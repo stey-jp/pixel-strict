@@ -71,7 +71,7 @@ class _WorkbenchState extends State<Workbench> {
   int _width = 0, _height = 0;
   ConversionResult? _result;
   bool _busy = false, _dragging = false, _manual = false, _median = false;
-  int _colors = 0, _smoothing = 2, _edge = 2;
+  int _colors = 0, _smoothing = 2, _edge = 2, _shape = 2;
   OutputMode _outputMode = OutputMode.preserve;
   String? _error;
   String _activity = '';
@@ -180,6 +180,7 @@ class _WorkbenchState extends State<Workbench> {
             colors: _colors == 0 ? null : _colors,
             smoothing: _smoothing,
             edgeProtection: _edge,
+            shapeProtection: _shape,
             median: _median,
           ),
         );
@@ -388,6 +389,12 @@ class _WorkbenchState extends State<Workbench> {
       const SizedBox(height: 24),
       _label('Edge protection', '輪郭・斜線・細線を保持'),
       _strength(_edge, (n) => _edge = n),
+      const SizedBox(height: 24),
+      _label('Shape protection', '外形・細線・小さな形を保持'),
+      KeyedSubtree(
+        key: const Key('shapeProtection'),
+        child: _strength(_shape, (n) => _shape = n),
+      ),
       const SizedBox(height: 20),
       SwitchListTile(
         contentPadding: EdgeInsets.zero,

@@ -1,5 +1,52 @@
 # 検証結果
 
+## Shape protection追加（2026-09-23）
+
+Windows 11 x64 / Flutter 3.47.0 / Dart 3.13.0 / Rust 1.97.1。Rust core中心の変更で、依存追加なし。preprocess → quantize → grid candidate → analyze → decide → evaluate、C ABI、両出力モードを維持しています。以下より下の記録は各変更時点の履歴です。
+
+- 外形候補、LINE（1〜2セル幅・8方向・端点・曲がり角）、2〜6セルの連結小形状を追加。FLAT起点の統合が線や小形状を消す問題を修正。外形付近の色統合は通常より狭い許容差に制限。
+- 領域別effective smoothing、形状ボーナス、実出力の接続評価を追加。元画像の共通プローブは最大16,384件で、粗い候補から線／小形状が消えても保持率を過大評価しない構成。保持率が低い候補のalignment加点も抑制。
+- UIにShape protection 弱／中／強、CLIに`--shape`、Options JSONに`shape_protection`を追加。未指定は2。Reportは既存classesの先頭4位置を保ちLINEを末尾へ追加し、外形・保持した小形状のセル数と形状指標を追加。C ABIの関数・バッファ所有権は変更なし。
+- `cargo test --release --locked --manifest-path core/Cargo.toml`: **28件成功**（既存19件＋Shape回帰9件）。透明外形・突起、透明／不透明背景の少数派線の端点、1〜2セル幅の縦横／両斜線、窓枠の角、単独ノイズ、2〜6セル形状、形が消える粗い候補の低評価、Auto、決定論的PNGを確認。
+- Preserveの1254×1254・P=2 / 3を含む既存全画素テストに成功。均等な整数単色矩形、元寸法、alpha 0/255、透明RGB=0、Logicalとの各セル色一致を維持。Logicalの非整除分割・既知32×32グリッドの3/4/6/8倍と197/1254への再拡大も継続して成功。
+- 新アルゴリズムの出力に合わせて既存PNG goldenとReportを再生成。Goldenとのバイト一致に加え、独立した32×32参照画像とのRGB MAE < 3.5も検証。旧版のPNG自体とのバイト一致は今回の仕様では要求せず、同じ入力・設定での再現性を維持。
+- `cargo clippy --release --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings`、`cargo fmt --manifest-path core/Cargo.toml --check`: **成功、指摘なし**。
+- `flutter analyze --no-pub`: **指摘なし**。`flutter test --no-pub`: **成功**。390×844 / 1280×800のShape初期値・変更、Output切替、操作の無効化とoverflowなしを確認。
+- Windows FFI統合テスト: **成功**。Shape 2/3のJSON受け渡し、追加Report、Preserve/Logicalの実PNG寸法、再現性、保存バイト列、Shape変更後の保存無効化、同期ズーム／パンと再変換後の位置維持を確認。
+- `flutter build windows --release --no-pub`: **成功**。同梱された`pixelstrict_core.dll`を直接C ABIで呼び、Shape未指定=2、classes 5要素、Autoでの小形状保持、最新PNG goldenとの一致を確認。成果物は`app/build/windows/x64/runner/Release/`。既存MVP ZIP / APKは更新せず、`output/`はGit対象に含めていません。
+
+### 合成fixtureでの比較
+
+`samples/shape/`にbuilding-like / line-heavy / flat-with-noiseの入力、Manual / AutoのPNGとJSONを追加。同じ解像度・Grid 48・Colors 32・Smoothing 3・Edge 2で旧版`9f081f1`と比較しました。
+
+| 項目 | 旧版 | Shape中 |
+| --- | ---: | ---: |
+| 低コントラストの建物の縁・窓枠174セル | 0保持 | 174保持 |
+| 2×3セルの小形状 | 0保持 | 6保持 |
+| 単独面ノイズ5点 | 5除去 | 5除去 |
+
+3つのfixtureはいずれもAutoで48×48セルを採用。建物の角・斜線・小形状を視覚比較し、ノイズ以外のManual出力は参照と一致することをテストでも検証しました。比較は合成入力についての結果で、実際のAI生成画像全般に対する保証ではありません。
+
+既存houseのAutoは32×32・11色、参照RGB MAEは旧3.149→3.113。Colors 32のManualは弱24色／強20色、MAEは3.255／3.258（旧3.089／2.894）。形と見なした小さな色のまとまりも残すため、面の均一性やRGB誤差が必ず改善するわけではありません。今回の単発Release計測はAuto約45ms、Manual約4ms。元画像の形状走査とセルの連結解析が増えるため、旧版より処理コストは増加します。
+
+旧／新のWindows Release同梱DLLを同じプロセスから各3回呼んだ中央値（decode〜PNG encode、ローカル計測）:
+
+| 入力・設定 | 旧版 | 新版 |
+| --- | ---: | ---: |
+| 192×192・Auto Logical | 22.6ms | 38.4ms |
+| 1254×1254・Auto Logical | 97.4ms | 146.8ms |
+| 1254×1254・Preserve Grid 418・Colors 24・Smoothing 3 | 114.0ms | 203.3ms |
+
+Auto Logicalはいずれも32×32を維持。入力は同じhouse画像で、1254版はNearest Neighborで拡大したもの。約1.5〜1.8倍のコスト増があり、極端に大きい画像・セル数での実機計測は引き続き必要です。プローブ数は上限固定、保護マスクはセル当たり3個の`u32`、連結解析は再利用する作業配列で実装しています。
+
+### 残る制限・次の検証
+
+- 外形判定は外周接続・透明境界・色差による近似で、前景／背景の意味分割ではありません。密な植物、似た色の接触物体、規則的なノイズ塊は誤保護の可能性があります。
+- Medianまたは量子化で失われた細部は後段では復元できません。1セル1色より細かい形は選択するGridに制約されます。特に低コントラストの斜線や曲線のAuto評価は近似です。
+- 次は実際の建物画像をfixture化して誤消去／誤保護を測定し、量子化前の形状情報の引き継ぎとbuilding / character / iconの係数調整を行うと効果的です。今回は係数を`ShapeBalance`に分離する土台まで実装。
+- Android / macOS / iOSの再ビルド・実機操作は今回未実施。既知のMSVC `linker_messages`はインポートライブラリ作成の日本語出力によるもので、リンク・Clippyは成功。
+- ネイティブアプリのためWeb成果物・監査対象URLなし。PSI / Lighthouse / Chrome CDP Issuesは対象外。GitHub Actions workflow / Deployment登録はいずれも0件で、自動デプロイ確認の対象なし。
+
 2026-09-22 / Windows 11 x64 / Flutter 3.47.0 / Dart 3.13.0 / Rust 1.97.1。
 
 ## 確認済み

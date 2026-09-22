@@ -5,6 +5,10 @@
     "width": 32,
     "height": 32
   },
+  "output_mode": "logical",
+  "output_width": 32,
+  "output_height": 32,
+  "cell_pitch": 1,
   "palette": [
     [
       37,
@@ -25,9 +29,33 @@
       255
     ],
     [
+      86,
+      68,
+      62,
+      255
+    ],
+    [
       155,
       134,
       104,
+      255
+    ],
+    [
+      44,
+      56,
+      73,
+      255
+    ],
+    [
+      107,
+      79,
+      71,
+      255
+    ],
+    [
+      190,
+      158,
+      114,
       255
     ],
     [
@@ -61,12 +89,6 @@
       255
     ],
     [
-      34,
-      46,
-      63,
-      255
-    ],
-    [
       133,
       72,
       61,
@@ -82,6 +104,12 @@
       169,
       140,
       106,
+      255
+    ],
+    [
+      106,
+      91,
+      75,
       255
     ],
     [
@@ -104,11 +132,16 @@
     ]
   ],
   "classes": [
-    699,
-    318,
-    7,
-    0
+    658,
+    215,
+    31,
+    0,
+    120
   ],
+  "silhouette_count": 209,
+  "preserved_detail_count": 43,
+  "line_continuity_score": 0.0005379573520838118,
+  "shape_score": 0.4670421727789712,
   "candidates": [
     {
       "grid": {
@@ -116,21 +149,30 @@
         "height": 32
       },
       "metrics": {
-        "surface_uniformity": 0.9904846862920011,
-        "edge_continuity": 0.8207900101433199,
-        "isolated_pixels": 11,
-        "source_error": 0.0005068943720468199,
+        "surface_uniformity": 0.9532654284002396,
+        "edge_continuity": 0.8596125877863809,
+        "isolated_pixels": 13,
+        "source_error": 0.0006201893728024078,
         "grid_alignment": 1.0,
-        "score": 2.2350787443043916
+        "silhouette_count": 209,
+        "preserved_detail_count": 43,
+        "silhouette_retention": 0.9943502824858758,
+        "line_continuity_retention": 0.0005379573520838118,
+        "small_detail_retention": 0.003246753246753247,
+        "corner_edge_consistency": 0.7880589070262598,
+        "shape_score": 0.4670421727789712,
+        "score": 0.6185306350126308
       }
     }
   ],
-  "processing_ms": 2.3479,
+  "processing_ms": 3.6052,
   "options": {
+    "output_mode": "logical",
     "grid_width": 32,
     "colors": 32,
     "smoothing": 3,
     "edge_protection": 2,
+    "shape_protection": 2,
     "median": false
   }
 }
