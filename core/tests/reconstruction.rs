@@ -1,12 +1,19 @@
 mod common;
 use common::*;
 use image::{Rgba, RgbaImage};
-use pixelstrict_core::{Options, convert, grid};
+use pixelstrict_core::{Options, OutputMode, convert, grid};
+
+fn logical() -> Options {
+    Options {
+        output_mode: OutputMode::Logical,
+        ..Options::default()
+    }
+}
 
 fn options(width: u32) -> Options {
     Options {
         grid_width: Some(width),
-        ..Options::default()
+        ..logical()
     }
 }
 fn decoded(bytes: &[u8]) -> RgbaImage {
@@ -120,7 +127,7 @@ fn diagonal_and_window_frame_survive() {
 fn auto_finds_fixture_grid_at_multiple_scales() {
     for scale in [3, 4, 6, 8] {
         let input = noisy(&house(), scale);
-        let result = convert(&encode(&input), &Options::default()).unwrap();
+        let result = convert(&encode(&input), &logical()).unwrap();
         assert_eq!(
             result.report.grid.width, 32,
             "scale {scale}: {:?}",
@@ -135,7 +142,7 @@ fn auto_handles_non_divisible_resampling() {
     for size in [197, 1254] {
         let input =
             image::imageops::resize(&source, size, size, image::imageops::FilterType::Nearest);
-        let result = convert(&encode(&input), &Options::default()).unwrap();
+        let result = convert(&encode(&input), &logical()).unwrap();
         assert_eq!(
             result.report.grid.width, 32,
             "size {size}: {:?}",

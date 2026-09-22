@@ -12,10 +12,20 @@ use std::{io::Cursor, time::Instant};
 pub const MAX_INPUT_BYTES: usize = 64 * 1024 * 1024;
 pub const MAX_PIXELS: u64 = 16_777_216;
 pub const MAX_CELLS: u64 = 262_144;
+pub const MAX_PRESERVE_CELLS: u64 = 1_048_576;
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OutputMode {
+    #[default]
+    Preserve,
+    Logical,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
+    pub output_mode: OutputMode,
     pub grid_width: Option<u32>,
     pub colors: Option<u8>,
     pub smoothing: u8,
@@ -25,6 +35,7 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self {
+            output_mode: OutputMode::Preserve,
             grid_width: None,
             colors: None,
             smoothing: 2,
@@ -34,7 +45,14 @@ impl Default for Options {
     }
 }
 impl Options {
-    fn validate(&self, w: u32, h: u32) -> Result<(), String> {
+    fn max_cells(&self) -> u64 {
+        match self.output_mode {
+            OutputMode::Preserve => MAX_PRESERVE_CELLS,
+            OutputMode::Logical => MAX_CELLS,
+        }
+    }
+
+    fn validate(&self, w: u32, h: u32) -> Result<Option<Grid>, String> {
         if !matches!(self.colors, None | Some(16 | 24 | 32)) {
             return Err("Colors must be Auto, 16, 24 or 32".into());
         }
@@ -47,12 +65,19 @@ impl Options {
                     "Grid width must be between 1 and source width ({w})"
                 ));
             }
-            let g = grid::from_width(w, h, n);
-            if g.height > h || g.width as u64 * g.height as u64 > MAX_CELLS {
-                return Err("Output exceeds 262144 cells; choose a smaller grid width".into());
+            let g = match self.output_mode {
+                OutputMode::Preserve => grid::preserve_from_width(w, h, n)?,
+                OutputMode::Logical => grid::from_width(w, h, n),
+            };
+            if g.height > h || g.width as u64 * g.height as u64 > self.max_cells() {
+                return Err(format!(
+                    "Output exceeds {} cells; choose a smaller grid width",
+                    self.max_cells()
+                ));
             }
+            return Ok(Some(g));
         }
-        Ok(())
+        Ok(None)
     }
 }
 
@@ -66,6 +91,11 @@ pub struct Report {
     pub source_width: u32,
     pub source_height: u32,
     pub grid: Grid,
+    pub output_mode: OutputMode,
+    pub output_width: u32,
+    pub output_height: u32,
+    /// Side length of each rendered square cell in output pixels (1 for Logical).
+    pub cell_pitch: u32,
     pub palette: Vec<[u8; 4]>,
     pub classes: [usize; 4],
     pub candidates: Vec<CandidateReport>,
@@ -139,7 +169,7 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
     if w == 0 || h == 0 || w > 8192 || h > 8192 || w as u64 * h as u64 > MAX_PIXELS {
         return Err("Image limit: 8192 per side and 16 megapixels".into());
     }
-    options.validate(w, h)?;
+    let manual_grid = options.validate(w, h)?;
     let mut reader = ImageReader::new(Cursor::new(bytes));
     reader.set_format(format.unwrap());
     let mut limits = image::Limits::default();
@@ -155,11 +185,14 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
     let q = color::quantize(&decoded, options.colors);
     drop(decoded);
     let (xp, yp) = grid::profiles(&q, w as usize, h as usize);
-    let mut grids = if let Some(n) = options.grid_width {
-        vec![grid::from_width(w, h, n)]
+    let mut grids = if let Some(g) = manual_grid {
+        vec![g]
     } else {
-        let mut all = grid::candidates(w, h);
-        all.retain(|g| g.width as u64 * g.height as u64 <= MAX_CELLS);
+        let mut all = match options.output_mode {
+            OutputMode::Preserve => grid::preserve_candidates(w, h),
+            OutputMode::Logical => grid::candidates(w, h),
+        };
+        all.retain(|g| g.width as u64 * g.height as u64 <= options.max_cells());
         all.sort_by(|a, b| {
             grid::alignment(*b, &xp, &yp)
                 .total_cmp(&grid::alignment(*a, &xp, &yp))
@@ -167,7 +200,7 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
         });
         all.truncate(8);
         // Always keep a conservative fine-grid fallback if there is little evidence.
-        if w as u64 * h as u64 <= MAX_CELLS
+        if w as u64 * h as u64 <= options.max_cells()
             && !all.contains(&Grid {
                 width: w,
                 height: h,
@@ -181,7 +214,7 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
         all
     };
     if grids.is_empty() {
-        return Err("No valid grid candidates".into());
+        return Err("No valid grid candidates within the cell limit; try Logical output".into());
     }
     let mut reports = Vec::new();
     let mut best: Option<(f64, Grid, Vec<u8>, [usize; 4])> = None;
@@ -221,18 +254,30 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
             .then_with(|| b.grid.width.cmp(&a.grid.width))
     });
     let (_, grid, out, classes) = best.unwrap();
-    let mut rgba = Vec::with_capacity(out.len() * 4);
+    let (output_width, output_height, cell_pitch) = match options.output_mode {
+        OutputMode::Preserve => (w, h, w / grid.width),
+        OutputMode::Logical => (grid.width, grid.height, 1),
+    };
+    let mut rgba = vec![0; output_width as usize * output_height as usize * 4];
     let mut used = [false; 32];
-    for k in out {
-        rgba.extend_from_slice(&q.colors[k as usize]);
+    for (i, k) in out.into_iter().enumerate() {
+        let x = (i as u32 % grid.width) * cell_pitch;
+        let y = (i as u32 / grid.width) * cell_pitch;
+        // Paint decided cells directly into integer rectangles, without resampling.
+        for row in y..y + cell_pitch {
+            let start = (row as usize * output_width as usize + x as usize) * 4;
+            for pixel in rgba[start..start + cell_pitch as usize * 4].chunks_exact_mut(4) {
+                pixel.copy_from_slice(&q.colors[k as usize]);
+            }
+        }
         used[k as usize] = true;
     }
     let mut png = Vec::new();
     image::codecs::png::PngEncoder::new(&mut png)
         .write_image(
             &rgba,
-            grid.width,
-            grid.height,
+            output_width,
+            output_height,
             image::ExtendedColorType::Rgba8,
         )
         .map_err(|e| e.to_string())?;
@@ -248,6 +293,10 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
             source_width: w,
             source_height: h,
             grid,
+            output_mode: options.output_mode,
+            output_width,
+            output_height,
+            cell_pitch,
             palette,
             classes,
             candidates: reports,

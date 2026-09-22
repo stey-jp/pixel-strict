@@ -7,20 +7,25 @@ import 'native_bindings.dart' as native;
 
 const maxInputBytes = 64 * 1024 * 1024;
 
+enum OutputMode { preserve, logical }
+
 class ConversionSettings {
   const ConversionSettings({
+    this.outputMode = OutputMode.preserve,
     this.gridWidth,
     this.colors,
     this.smoothing = 2,
     this.edgeProtection = 2,
     this.median = false,
   });
+  final OutputMode outputMode;
   final int? gridWidth;
   final int? colors;
   final int smoothing;
   final int edgeProtection;
   final bool median;
   Map<String, Object?> toJson() => {
+    'output_mode': outputMode.name,
     'grid_width': gridWidth,
     'colors': colors,
     'smoothing': smoothing,
@@ -33,8 +38,11 @@ class ConversionResult {
   const ConversionResult(this.png, this.report);
   final Uint8List png;
   final Map<String, dynamic> report;
-  int get width => (report['grid'] as Map)['width'] as int;
-  int get height => (report['grid'] as Map)['height'] as int;
+  int get width => report['output_width'] as int;
+  int get height => report['output_height'] as int;
+  int get gridWidth => (report['grid'] as Map)['width'] as int;
+  int get gridHeight => (report['grid'] as Map)['height'] as int;
+  int get cellPitch => report['cell_pitch'] as int;
   int get colorCount => (report['palette'] as List).length;
   double get milliseconds => (report['processing_ms'] as num).toDouble();
 }

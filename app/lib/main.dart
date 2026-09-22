@@ -72,6 +72,7 @@ class _WorkbenchState extends State<Workbench> {
   ConversionResult? _result;
   bool _busy = false, _dragging = false, _manual = false, _median = false;
   int _colors = 0, _smoothing = 2, _edge = 2;
+  OutputMode _outputMode = OutputMode.preserve;
   String? _error;
   String _activity = '';
 
@@ -174,6 +175,7 @@ class _WorkbenchState extends State<Workbench> {
         final result = await convertImage(
           _source!,
           ConversionSettings(
+            outputMode: _outputMode,
             gridWidth: width,
             colors: _colors == 0 ? null : _colors,
             smoothing: _smoothing,
@@ -322,6 +324,24 @@ class _WorkbenchState extends State<Workbench> {
         style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
       ),
       const SizedBox(height: 28),
+      _label('Output', 'PNGの出力サイズ'),
+      DropdownButtonFormField<OutputMode>(
+        key: const Key('outputMode'),
+        isExpanded: true,
+        initialValue: _outputMode,
+        items: const [
+          DropdownMenuItem(
+            value: OutputMode.preserve,
+            child: Text('Preserve size'),
+          ),
+          DropdownMenuItem(
+            value: OutputMode.logical,
+            child: Text('Logical pixels'),
+          ),
+        ],
+        onChanged: _busy ? null : (v) => _change(() => _outputMode = v!),
+      ),
+      const SizedBox(height: 24),
       _label('Grid', '正規グリッドの解像度'),
       SegmentedButton<bool>(
         segments: const [
@@ -342,9 +362,9 @@ class _WorkbenchState extends State<Workbench> {
             enabled: !_busy,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            decoration: const InputDecoration(
-              labelText: '出力幅（セル数）',
-              helperText: '高さは元画像の比率から決定',
+            decoration: InputDecoration(
+              labelText: 'Grid width（セル数）',
+              helperText: _gridHint,
             ),
             onChanged: (_) => _change(() {}),
           ),
@@ -395,12 +415,25 @@ class _WorkbenchState extends State<Workbench> {
         style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
       ),
       const SizedBox(height: 16),
-      const Text(
-        '1セル = 1ピクセルのPNG\n半透明・補間・ディザリングなし',
-        style: TextStyle(color: _muted, fontSize: 11, height: 1.7),
+      Text(
+        '${_outputMode == OutputMode.preserve ? '元解像度のPNG · 均等な整数セル' : '1セル = 1ピクセルのPNG'}\n半透明・補間・ディザリングなし',
+        style: const TextStyle(color: _muted, fontSize: 11, height: 1.7),
       ),
     ],
   );
+
+  String get _gridHint {
+    if (_outputMode == OutputMode.logical) return '高さは元画像の比率から決定';
+    final columns = int.tryParse(_gridController.text);
+    if (columns != null &&
+        columns > 0 &&
+        columns <= _width &&
+        _width % columns == 0) {
+      final pitch = _width ~/ columns;
+      if (_height % pitch == 0) return '$columns cells / ${pitch}px';
+    }
+    return '元画像の両辺を割り切る正方形セルのみ';
+  }
 
   Widget _label(String title, String subtitle) => Padding(
     padding: const EdgeInsets.only(bottom: 10),
@@ -485,7 +518,7 @@ class _WorkbenchState extends State<Workbench> {
           Padding(
             padding: const EdgeInsets.only(top: 14),
             child: Text(
-              '${_result!.width} × ${_result!.height} px  ·  ${_result!.milliseconds.toStringAsFixed(0)} ms  ·  ${(_result!.report['candidates'] as List).length}候補を評価',
+              '${_result!.width} × ${_result!.height} px  ·  ${_result!.milliseconds.toStringAsFixed(0)} ms  ·  ${(_result!.report['candidates'] as List).length}候補を評価\nGrid ${_result!.gridWidth} × ${_result!.gridHeight} cells / ${_result!.cellPitch}px',
               key: const Key('resultInfo'),
               style: const TextStyle(color: _accent, fontSize: 13),
             ),

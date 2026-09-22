@@ -14,6 +14,39 @@ pub fn from_width(width: u32, height: u32, columns: u32) -> Grid {
     }
 }
 
+pub fn preserve_from_width(width: u32, height: u32, columns: u32) -> Result<Grid, String> {
+    if columns == 0 || columns > width || !width.is_multiple_of(columns) {
+        return Err(format!(
+            "Preserve output requires equal integer square cells: grid width must divide source width ({width})"
+        ));
+    }
+    let pitch = width / columns;
+    if !height.is_multiple_of(pitch) {
+        return Err(format!(
+            "Preserve output requires equal integer square cells: source height ({height}) must be divisible by cell pitch ({pitch}px)"
+        ));
+    }
+    Ok(Grid {
+        width: columns,
+        height: height / pitch,
+    })
+}
+
+// Every divisor of gcd(width, height) is an exact square pixel pitch.
+pub fn preserve_candidates(width: u32, height: u32) -> Vec<Grid> {
+    let (mut a, mut b) = (width, height);
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    (1..=a)
+        .filter(|pitch| a.is_multiple_of(*pitch))
+        .map(|pitch| Grid {
+            width: width / pitch,
+            height: height / pitch,
+        })
+        .collect()
+}
+
 // Includes exact divisors and nearby integer reconstructions for non-divisible images.
 pub fn candidates(width: u32, height: u32) -> Vec<Grid> {
     let mut result = Vec::new();

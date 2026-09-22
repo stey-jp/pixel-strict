@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -47,16 +49,25 @@ void main() {
           .transformationController!;
       final beforeConversion = viewController.value.clone();
       expect(beforeConversion.getMaxScaleOnAxis(), greaterThan(1));
-      await tester.ensureVisible(find.byKey(const Key('convert')));
-      await tester.tap(find.byKey(const Key('convert')));
-      for (var i = 0; i < 200; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-        if (find.byKey(const Key('resultInfo')).evaluate().isNotEmpty) break;
+      Future<void> convert() async {
+        await tester.ensureVisible(find.byKey(const Key('convert')));
+        await tester.tap(find.byKey(const Key('convert')));
+        for (var i = 0; i < 200; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+          if (find.byKey(const Key('resultInfo')).evaluate().isNotEmpty) break;
+        }
+        expect(find.byKey(const Key('resultInfo')), findsOneWidget);
+        await tester.pumpAndSettle();
       }
-      expect(find.byKey(const Key('resultInfo')), findsOneWidget);
+
+      await convert();
       expect(
         tester.widget<Text>(find.byKey(const Key('resultInfo'))).data,
-        contains('32 × 32'),
+        contains('192 × 192 px'),
+      );
+      expect(
+        tester.widget<Text>(find.byKey(const Key('resultInfo'))).data,
+        contains('Grid 32 × 32 cells / 6px'),
       );
       expect(
         tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,
@@ -121,7 +132,39 @@ void main() {
         source,
         const ConversionSettings(gridWidth: 32),
       );
+      Future<void> expectPngSize(Uint8List png, int width, int height) async {
+        final buffer = await ui.ImmutableBuffer.fromUint8List(png);
+        final descriptor = await ui.ImageDescriptor.encoded(buffer);
+        try {
+          expect(descriptor.width, width);
+          expect(descriptor.height, height);
+        } finally {
+          descriptor.dispose();
+          buffer.dispose();
+        }
+      }
+
+      expect(a.width, 192);
+      expect(a.height, 192);
+      expect(a.gridWidth, 32);
+      expect(a.gridHeight, 32);
+      expect(a.cellPitch, 6);
+      expect(a.report['output_mode'], 'preserve');
+      await expectPngSize(a.png, a.width, a.height);
       expect(a.png, orderedEquals(b.png));
+      final logical = await convertImage(
+        source,
+        const ConversionSettings(gridWidth: 32, outputMode: OutputMode.logical),
+      );
+      expect(logical.width, 32);
+      expect(logical.height, 32);
+      expect(logical.cellPitch, 1);
+      expect(logical.report['output_mode'], 'logical');
+      await expectPngSize(logical.png, logical.width, logical.height);
+      await expectLater(
+        convertImage(source, const ConversionSettings(gridWidth: 31)),
+        throwsA(isA<FormatException>()),
+      );
       final temp = await Directory.systemTemp.createTemp('pixelstrict-test-');
       final saved = File('${temp.path}/strict.png');
       try {
@@ -130,10 +173,58 @@ void main() {
       } finally {
         await temp.delete(recursive: true);
       }
+      final beforeModeChange = viewController.value.clone();
+      final output = find.byKey(const Key('outputMode'));
+      await tester.ensureVisible(output);
+      await tester.tap(output);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Logical pixels').last);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('resultInfo')), findsNothing);
+      expect(
+        tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,
+        isNull,
+      );
+      await convert();
+      expect(
+        tester.widget<Text>(find.byKey(const Key('resultInfo'))).data,
+        contains('32 × 32 px'),
+      );
+      expect(
+        viewController.value.storage,
+        orderedEquals(beforeModeChange.storage),
+      );
+      expectLinkedPreviews();
       await tester.ensureVisible(find.text('Manual'));
       await tester.tap(find.text('Manual'));
       await tester.pump();
       expect(find.byKey(const Key('gridWidth')), findsOneWidget);
+      expect(find.byKey(const Key('resultInfo')), findsNothing);
+      expect(
+        tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,
+        isNull,
+      );
+      await tester.ensureVisible(output);
+      await tester.tap(output);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Preserve size').last);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('gridWidth')), '32');
+      await tester.pump();
+      expect(find.text('32 cells / 6px'), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('gridWidth')), '31');
+      await tester.ensureVisible(find.byKey(const Key('convert')));
+      await tester.tap(find.byKey(const Key('convert')));
+      for (var i = 0; i < 100; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        if (find
+            .textContaining('Preserve output requires')
+            .evaluate()
+            .isNotEmpty) {
+          break;
+        }
+      }
+      expect(find.textContaining('Preserve output requires'), findsOneWidget);
       expect(find.byKey(const Key('resultInfo')), findsNothing);
       expect(
         tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,

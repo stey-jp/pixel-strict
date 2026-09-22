@@ -1,7 +1,7 @@
 #[path = "../tests/common/mod.rs"]
 mod common;
 use common::*;
-use pixelstrict_core::{Options, convert};
+use pixelstrict_core::{Options, OutputMode, convert};
 use std::{env, fs, path::PathBuf};
 
 fn main() {
@@ -11,15 +11,20 @@ fn main() {
     let input = noisy(&reference, 6);
     fs::write(dir.join("house-reference.png"), encode(&reference)).unwrap();
     fs::write(dir.join("house-pseudo.png"), encode(&input)).unwrap();
+    // Keep reference comparisons at one pixel per logical cell.
+    let logical = Options {
+        output_mode: OutputMode::Logical,
+        ..Options::default()
+    };
     for (name, options) in [
-        ("auto", Options::default()),
+        ("auto", logical.clone()),
         (
             "surface-weak",
             Options {
                 grid_width: Some(32),
                 colors: Some(32),
                 smoothing: 1,
-                ..Options::default()
+                ..logical.clone()
             },
         ),
         (
@@ -28,7 +33,7 @@ fn main() {
                 grid_width: Some(32),
                 colors: Some(32),
                 smoothing: 3,
-                ..Options::default()
+                ..logical
             },
         ),
     ] {

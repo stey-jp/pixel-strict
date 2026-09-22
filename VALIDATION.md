@@ -1,4 +1,4 @@
-# MVP検証結果
+# 検証結果
 
 2026-09-22 / Windows 11 x64 / Flutter 3.47.0 / Dart 3.13.0 / Rust 1.97.1。
 
@@ -37,4 +37,23 @@
 - 初回AndroidビルドでローカルSDK XMLバージョン差の警告。SDKツール更新が必要です。
 - RustビルドがMSVCの日本語「インポートライブラリ作成」メッセージを`linker_messages`警告として表示。リンク成功済みで、コード不良ではありません。
 - Webの成果物はなく、PSI/Lighthouse/Chrome CDP Issuesの対象URLなし。
-- Gitリポジトリ／remoteは元から未設定。commit・push・外部公開は行っていません。
+- 初回MVP検証時はGitリポジトリ／remoteが未設定で、commit・push・外部公開は行っていませんでした。
+
+## Preserve Resolution追加（2026-09-23）
+
+Windows x64 / Flutter 3.47.0 / Dart 3.13.0 / Rust 1.97.1。新規依存なし。preprocess・OKLab量子化・alignment・analyze / decide / evaluate・Surface Strict / Edge Strictの処理は維持。
+
+- `cargo test --locked --manifest-path core/Cargo.toml`: **19件成功**（既存回帰11件＋出力モード7件＋CLI 1件）。従来の非整除グリッド・画質回帰はLogicalを明示して継続。
+- Preserveの1254×1254・P=3（418×418セル）とP=2（627×627セル）で入力／出力寸法が完全一致。長方形・P=1 / 6 / 11も検証。全セル領域の全画素が同一RGBA、出力パレット以外の色なし、alphaは0/255のみ、透明はRGBA=(0,0,0,0)。同一入力・設定でPNGバイト列一致。上限内ではLogicalの各決定セル色とも完全一致。
+- PreserveのAuto候補が両辺のgcdの全約数から生成されること、128pxを超えるpitchも含むこと、採用・評価対象が均等な正方形整数セルのみであることを検証。既存合成画像の3 / 4 / 6 / 8倍では32×32セルを維持。
+- 1254×1254・Manual Grid 314、および幅のみ整除でき高さが整除できないケースは明確なエラー。Preserveは1,048,576セル、Logicalは従来の262,144セル上限を検証。両辺が互いに素で唯一のP=1が上限を超えるAuto入力もエラー。
+- Logicalは従来の出力寸法・非整除分割を維持。既存Auto / Surface弱 / Surface強の3サンプルPNGと**バイト単位で一致**。
+- 既存Options JSON（output_mode未指定）をC ABI経由で変換し、Preserveがデフォルトであること、追加Report項目と実PNG寸法を確認。C ABIの関数・所有権に変更なし。
+- CLIは省略時Preserve、`--output preserve|logical`、既存オプションとの併用、help、JSON report、不正値／値欠落／非整除Gridの拒否、既存ファイルの上書き防止を検証。
+- `cargo clippy --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings`: **指摘なし**。
+- `flutter analyze --no-pub`: **指摘なし**。`flutter test --no-pub`: **成功**。390×844 / 1280×800でOutputの初期値・切替・初期操作の無効化を確認。検証中に発見したOutput選択欄の横はみ出しは修正し、再検証でoverflowなし。
+- `flutter test integration_test/conversion_test.dart -d windows --no-pub --dart-define=SAMPLE_PATH=C:/Users/Daiki/Documents/PixelStrict/pixel-strict/samples/house-pseudo.png`: **成功**。Preserveの192×192 PNG（32×32セル・6px）を実画像ヘッダとConversionResultの両方で検証。Logicalの32×32、保存バイト列、再現性、モード変更による古い結果の無効化、Manualのpitch表示・非整除エラー表示、両側の同期ズーム／パン、再変換後の表示位置維持も確認。
+- `cargo build --release --locked --manifest-path core/Cargo.toml`、`flutter build windows --release --no-pub`: **成功**。Release CLIで1254×1254・Grid 418 / 627 / AutoのPreserve、Grid 418のLogical、Grid 314の拒否を確認。Windows Releaseに同梱された`pixelstrict_core.dll`も直接C ABIを呼び出し、未指定時Preserve・実PNG 192×192・pitch 6を確認。
+- Windows成果物: `app/build/windows/x64/runner/Release/`、CLI: `core/target/release/pixelstrict.exe`。既存`output/`のMVP ZIP / APKは更新せず、Git対象にも含めていません。
+
+今回の範囲で未解決のテスト失敗なし。MSVCの日本語インポートライブラリ作成メッセージがRustの`linker_messages`警告として出る既知の環境要因は継続（リンク成功、clippy指摘なし）。Android / macOS / iOSの再ビルド・実機検証は今回未実施。Web成果物・対象URLはなく、PSI / Lighthouse / Chrome CDP Issuesは対象外。GitHub Actions workflowとDeployment登録はともに0件のため、自動デプロイの検証対象なし。

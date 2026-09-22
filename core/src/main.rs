@@ -1,11 +1,11 @@
-use pixelstrict_core::{MAX_INPUT_BYTES, Options, convert};
+use pixelstrict_core::{MAX_INPUT_BYTES, Options, OutputMode, convert};
 use std::{env, fs, path::Path, process};
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!(
-            "PixelStrict\nUsage: pixelstrict INPUT OUTPUT.png [--grid auto|WIDTH] [--colors auto|16|24|32] [--smoothing 1|2|3] [--edge 1|2|3] [--median] [--report FILE.json]\nOutput is one pixel per cell. Existing files are never overwritten."
+            "PixelStrict\nUsage: pixelstrict INPUT OUTPUT.png [--grid auto|WIDTH] [--output preserve|logical] [--colors auto|16|24|32] [--smoothing 1|2|3] [--edge 1|2|3] [--median] [--report FILE.json]\nOutput defaults to preserve: source dimensions with equal integer square cells. Grid WIDTH is the logical cell count across; its pitch must divide both source dimensions. Logical output keeps one pixel per cell. Existing files are never overwritten."
         );
         return Ok(());
     }
@@ -34,6 +34,13 @@ fn run() -> Result<(), String> {
                 .map_err(|_| format!("Invalid value for {flag}"))
         };
         match flag {
+            "--output" => {
+                options.output_mode = match value.to_str() {
+                    Some("preserve") => OutputMode::Preserve,
+                    Some("logical") => OutputMode::Logical,
+                    _ => return Err("Output must be preserve or logical".into()),
+                }
+            }
             "--grid" => {
                 options.grid_width = if value == "auto" {
                     None
