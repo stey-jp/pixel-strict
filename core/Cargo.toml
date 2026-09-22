@@ -1,0 +1,22 @@
+[package]
+name = "pixelstrict-core"
+version = "0.1.0"
+edition = "2024"
+description = "Deterministic pseudo-pixel art reconstruction, independent of any UI"
+
+[lib]
+name = "pixelstrict_core"
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "pixelstrict"
+path = "src/main.rs"
+
+[dependencies]
+image = { version = "0.25.8", default-features = false, features = ["png", "jpeg", "webp"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

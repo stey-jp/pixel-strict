@@ -1,0 +1,4 @@
+/core/target/
+/output/
+*.log
+.DS_Store

@@ -1,0 +1,29 @@
+{
+  "auto": {
+    "rgb_mae": 3.149,
+    "colors": 11,
+    "ms": 26.71,
+    "grid": {
+      "width": 32,
+      "height": 32
+    }
+  },
+  "surface-weak": {
+    "rgb_mae": 3.089,
+    "colors": 22,
+    "ms": 2.49,
+    "grid": {
+      "width": 32,
+      "height": 32
+    }
+  },
+  "surface-strong": {
+    "rgb_mae": 2.894,
+    "colors": 16,
+    "ms": 2.35,
+    "grid": {
+      "width": 32,
+      "height": 32
+    }
+  }
+}

@@ -1,0 +1,218 @@
+{
+  "source_width": 192,
+  "source_height": 192,
+  "grid": {
+    "width": 32,
+    "height": 32
+  },
+  "palette": [
+    [
+      36,
+      48,
+      65,
+      255
+    ],
+    [
+      199,
+      167,
+      122,
+      255
+    ],
+    [
+      76,
+      98,
+      82,
+      255
+    ],
+    [
+      137,
+      76,
+      65,
+      255
+    ],
+    [
+      247,
+      208,
+      126,
+      255
+    ],
+    [
+      89,
+      72,
+      66,
+      255
+    ],
+    [
+      160,
+      136,
+      105,
+      255
+    ],
+    [
+      43,
+      54,
+      71,
+      255
+    ],
+    [
+      104,
+      78,
+      69,
+      255
+    ],
+    [
+      192,
+      160,
+      116,
+      255
+    ],
+    [
+      239,
+      216,
+      170,
+      255
+    ]
+  ],
+  "classes": [
+    699,
+    310,
+    15,
+    0
+  ],
+  "candidates": [
+    {
+      "grid": {
+        "width": 32,
+        "height": 32
+      },
+      "metrics": {
+        "surface_uniformity": 0.98814463544754,
+        "edge_continuity": 0.9657381849048524,
+        "isolated_pixels": 15,
+        "source_error": 0.0005147451486914413,
+        "grid_alignment": 0.9985583402790446,
+        "score": 2.2498235982960044
+      }
+    },
+    {
+      "grid": {
+        "width": 64,
+        "height": 64
+      },
+      "metrics": {
+        "surface_uniformity": 0.9942903752039152,
+        "edge_continuity": 0.8695832919177877,
+        "isolated_pixels": 7,
+        "source_error": 0.0004289527446763354,
+        "grid_alignment": 0.860008472759013,
+        "score": 1.9658118036718897
+      }
+    },
+    {
+      "grid": {
+        "width": 96,
+        "height": 96
+      },
+      "metrics": {
+        "surface_uniformity": 0.9978155763965748,
+        "edge_continuity": 0.8675067662036026,
+        "isolated_pixels": 17,
+        "source_error": 0.00036026634795878937,
+        "grid_alignment": 0.8141749757418824,
+        "score": 1.869621336604427
+      }
+    },
+    {
+      "grid": {
+        "width": 23,
+        "height": 23
+      },
+      "metrics": {
+        "surface_uniformity": 0.9564958283671037,
+        "edge_continuity": 0.8777579820264025,
+        "isolated_pixels": 11,
+        "source_error": 0.0056179719127385855,
+        "grid_alignment": 0.2957541360273753,
+        "score": 0.6657890800300681
+      }
+    },
+    {
+      "grid": {
+        "width": 19,
+        "height": 19
+      },
+      "metrics": {
+        "surface_uniformity": 0.9518619436875567,
+        "edge_continuity": 0.9461158229130838,
+        "isolated_pixels": 8,
+        "source_error": 0.006559268021486719,
+        "grid_alignment": 0.26867947226861305,
+        "score": 0.6030147506489049
+      }
+    },
+    {
+      "grid": {
+        "width": 38,
+        "height": 38
+      },
+      "metrics": {
+        "surface_uniformity": 0.9650335434031307,
+        "edge_continuity": 0.9108361962466079,
+        "isolated_pixels": 12,
+        "source_error": 0.004308921757478514,
+        "grid_alignment": 0.23897038328081396,
+        "score": 0.592122571964871
+      }
+    },
+    {
+      "grid": {
+        "width": 37,
+        "height": 37
+      },
+      "metrics": {
+        "surface_uniformity": 0.9657475226195605,
+        "edge_continuity": 0.9172415645306813,
+        "isolated_pixels": 18,
+        "source_error": 0.004681042570301639,
+        "grid_alignment": 0.19670527209661465,
+        "score": 0.4968107215509517
+      }
+    },
+    {
+      "grid": {
+        "width": 27,
+        "height": 27
+      },
+      "metrics": {
+        "surface_uniformity": 0.9480793583790629,
+        "edge_continuity": 0.8812995148725485,
+        "isolated_pixels": 25,
+        "source_error": 0.005130390688736471,
+        "grid_alignment": 0.17529967710985997,
+        "score": 0.42165757400368414
+      }
+    },
+    {
+      "grid": {
+        "width": 192,
+        "height": 192
+      },
+      "metrics": {
+        "surface_uniformity": 0.998265920401517,
+        "edge_continuity": 0.9664219690468671,
+        "isolated_pixels": 14,
+        "source_error": 0.00022291215330009587,
+        "grid_alignment": 0.0,
+        "score": 0.23952193126806404
+      }
+    }
+  ],
+  "processing_ms": 26.7085,
+  "options": {
+    "grid_width": null,
+    "colors": null,
+    "smoothing": 2,
+    "edge_protection": 2,
+    "median": false
+  }
+}

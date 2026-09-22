@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 16 16" shape-rendering="crispEdges">
+  <title>PixelStrict</title>
+  <desc>An integer-grid P in lime on a dark pixel-corner tile.</desc>
+  <path fill="#111515" d="M3 0H13V1H15V3H16V13H15V15H13V16H3V15H1V13H0V3H1V1H3Z"/>
+  <g fill="#d5fa7a">
+    <rect x="3" y="3" width="8" height="2"/>
+    <rect x="3" y="5" width="2" height="2"/>
+    <rect x="11" y="5" width="2" height="2"/>
+    <rect x="3" y="7" width="8" height="2"/>
+    <rect x="3" y="9" width="2" height="4"/>
+  </g>
+</svg>
