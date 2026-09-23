@@ -178,6 +178,49 @@ fn straight_subcell_lines_do_not_grow_teeth_or_break_at_shade_changes() {
 }
 
 #[test]
+fn straight_face_boundaries_keep_source_position_across_shading() {
+    let reference = shapes::straight_facade();
+    for horizontal in [false, true] {
+        let source = if horizontal {
+            image::imageops::rotate90(&reference)
+        } else {
+            reference.clone()
+        };
+        for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+            let options = Options {
+                output_mode,
+                ..settings(32)
+            };
+            let result = convert(&encode(&source), &options).unwrap();
+            let out = decoded(&result.png);
+            let out = if horizontal {
+                image::imageops::rotate270(&out)
+            } else {
+                out
+            };
+            let pitch = if output_mode == OutputMode::Preserve {
+                3
+            } else {
+                1
+            };
+            for y in 0..32 {
+                // Source boundary x=31 belongs at grid boundary x=30: two
+                // pixels of this mixed cell are on the light face in every row.
+                assert!(out.get_pixel(9 * pitch, y * pitch)[0] < 180);
+                assert!(
+                    out.get_pixel(10 * pitch, y * pitch)[0] > 200,
+                    "edge shifted at row {y}"
+                );
+            }
+            for (x, y, pixel) in out.enumerate_pixels() {
+                assert_eq!(pixel, out.get_pixel(x / pitch * pitch, y / pitch * pitch));
+            }
+            assert_eq!(result.png, convert(&encode(&source), &options).unwrap().png);
+        }
+    }
+}
+
+#[test]
 fn straight_alignment_keeps_separate_lines_wide_columns_and_junctions() {
     let source = RgbaImage::from_fn(96, 96, |x, y| {
         let ink = (8..88).contains(&y) && ((16..24).contains(&x) || [43, 45, 67, 68].contains(&x))

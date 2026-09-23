@@ -2,6 +2,7 @@ use crate::{Options, color::Quantized, grid::Grid};
 use serde::Serialize;
 
 const AXES: [(i32, i32); 4] = [(1, 0), (0, 1), (1, 1), (1, -1)];
+const STRAIGHT_CONTRAST: f32 = 0.0007;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -19,6 +20,8 @@ pub struct Cell {
     direction: [u8; 32],
     // Colors touching left/right/top/bottom source-cell boundaries.
     borders: [u32; 4],
+    // Allowed source colors on the majority side of a stable straight boundary.
+    boundary_colors: u32,
     pub dominant: u8,
     pub class: Class,
     // Palette bitsets keep protection bounded to colors actually present in a cell.
@@ -58,7 +61,7 @@ fn smoothing_factor(c: &Cell) -> f32 {
 }
 
 fn protected(c: &Cell) -> bool {
-    c.silhouette | c.lines | c.details != 0
+    c.silhouette | c.lines | c.details | c.boundary_colors != 0
 }
 
 fn neighbor(i: usize, dx: i32, dy: i32, g: Grid) -> Option<usize> {
@@ -169,6 +172,7 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
                 line,
                 direction,
                 borders,
+                boundary_colors: 0,
                 dominant: dominant as u8,
                 class,
                 silhouette: 0,
@@ -196,7 +200,104 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
     protect_silhouettes(&mut cells, q, g);
     protect_lines(&mut cells, q, g, &shades);
     protect_details(&mut cells, q, g);
+    for (i, cell) in cells.iter_mut().enumerate() {
+        if cell
+            .coverage
+            .iter()
+            .enumerate()
+            .any(|(k, &v)| v >= 0.055 && q.distances[k][cell.dominant as usize] > STRAIGHT_CONTRAST)
+        {
+            cell.boundary_colors = straight_boundary(i, cell, q, w, h, g);
+        }
+    }
     cells
+}
+
+fn straight_boundary(i: usize, cell: &Cell, q: &Quantized, w: usize, h: usize, g: Grid) -> u32 {
+    let (gx, gy) = (i % g.width as usize, i / g.width as usize);
+    for vertical in [true, false] {
+        let (column, row, width, height, columns, rows) = if vertical {
+            (gx, gy, w, h, g.width as usize, g.height as usize)
+        } else {
+            (gy, gx, h, w, g.height as usize, g.width as usize)
+        };
+        let (x0, x1) = (column * width / columns, (column + 1) * width / columns);
+        if x1 - x0 < 2 || column == 0 || column + 1 == columns {
+            continue;
+        }
+        let at =
+            |x: usize, y: usize| q.labels[if vertical { y * w + x } else { x * w + y }] as usize;
+        let mid = (row * height / rows + (row + 1) * height / rows - 1) / 2;
+        // Anchor inside the neighboring faces, excluding narrow strokes with
+        // the same background on both sides.
+        let left = ((column - 1) * width / columns + x0 - 1) / 2;
+        let right = (x1 + (column + 2) * width / columns - 1) / 2;
+        let (a, b) = (at(left, mid), at(right, mid));
+        let contrast = q.distances[a][b];
+        if contrast <= STRAIGHT_CONTRAST {
+            continue;
+        }
+        let tolerance = contrast * 0.25;
+        // Verify broad faces, rather than accidentally anchoring on another
+        // nearby thin line. Palette shades are grouped against fixed anchors.
+        let broad = |start: usize, end: usize, seed: usize| {
+            (start..end)
+                .filter(|&x| q.distances[seed][at(x, mid)] <= tolerance)
+                .count()
+                * 4
+                >= (end - start) * 3
+        };
+        if !broad((column - 1) * width / columns, x0, a)
+            || !broad(x1, (column + 2) * width / columns, b)
+        {
+            continue;
+        }
+        let agrees = |x, y| {
+            q.distances[a][at(x - 1, y)] <= tolerance && q.distances[b][at(x, y)] <= tolerance
+        };
+        let boundary = (x0 + 1..x1)
+            .filter(|&x| agrees(x, mid))
+            .max_by(|&x, &other| {
+                q.distances[at(x - 1, mid)][at(x, mid)]
+                    .total_cmp(&q.distances[at(other - 1, mid)][at(other, mid)])
+                    .then_with(|| other.cmp(&x))
+            });
+        let Some(boundary) = boundary else {
+            continue;
+        };
+        let (mut total, mut aligned) = (0, 0);
+        for r in row.saturating_sub(2)..=(row + 2).min(rows - 1) {
+            let (y0, y1) = (r * height / rows, (r + 1) * height / rows);
+            let mut previous = usize::MAX;
+            for y in [y0, (y0 + y1 - 1) / 2, y1 - 1] {
+                if y == previous {
+                    continue;
+                }
+                previous = y;
+                total += 1;
+                let (row_a, row_b) = (at(left, y), at(right, y));
+                let row_contrast = q.distances[row_a][row_b];
+                aligned += usize::from(
+                    row_contrast > STRAIGHT_CONTRAST
+                        && q.distances[row_a][at(boundary - 1, y)] <= row_contrast * 0.25
+                        && q.distances[row_b][at(boundary, y)] <= row_contrast * 0.25,
+                );
+            }
+        }
+        if total < 9 || aligned * 5 < total * 4 {
+            continue;
+        }
+        let target = if boundary - x0 >= x1 - boundary { a } else { b };
+        let mask = (0..q.colors.len())
+            .filter(|&k| {
+                cell.coverage[k] >= 0.055 && q.distances[target][k] <= tolerance.min(0.004)
+            })
+            .fold(0, |mask, k| mask | (1 << k));
+        if mask != 0 {
+            return mask;
+        }
+    }
+    0
 }
 
 fn protect_silhouettes(cells: &mut [Cell], q: &Quantized, g: Grid) {
@@ -597,6 +698,9 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
         let mut best_score = f32::NEG_INFINITY;
         let effective_smoothing = smooth * smoothing_factor(c);
         for k in 0..q.colors.len() {
+            if c.boundary_colors != 0 && c.boundary_colors & (1 << k) == 0 {
+                continue;
+            }
             let delta = q.distances[c.dominant as usize][k];
             let near = delta <= tolerance;
             if c.coverage[k] < 0.055
@@ -606,7 +710,7 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
             {
                 continue;
             }
-            if straight_spill(i, k, cells, g, q, &shades) {
+            if c.boundary_colors == 0 && straight_spill(i, k, cells, g, q, &shades) {
                 continue;
             }
             let continuity = ns.clone().map(|n| cells[n].coverage[k]).sum::<f32>() / neighbor_count;
@@ -698,6 +802,7 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
                     && !visited[n]
                     && cells[n].class != Class::Detail
                     && cells[n].lines | cells[n].details == 0
+                    && cells[n].boundary_colors == 0
                     // Exterior boundaries allow only much closer shades of the
                     // same face; opacity/contrast boundaries cannot be merged.
                     && q.distances[seed][before[n] as usize]

@@ -7,11 +7,33 @@ void main() {
   testWidgets(
     'Empty workbench disables conversion and save at mobile and desktop sizes',
     (tester) async {
-      for (final size in [const Size(390, 844), const Size(1280, 800)]) {
+      for (final size in [
+        const Size(390, 844),
+        const Size(1280, 800),
+        const Size(1280, 600),
+      ]) {
         await tester.binding.setSurfaceSize(size);
         await tester.pumpWidget(const PixelStrictApp());
-        await tester.pump();
+        await tester.pumpAndSettle();
         expect(find.text('PixelStrict'), findsOneWidget);
+        expect(
+          tester.widget<Text>(find.byKey(const Key('appVersion'))).data,
+          'v0.1.4+5',
+        );
+        for (final text in [
+          '曖昧なピクセルを、使える素材へ。',
+          'Surface Strict + Edge Strict',
+          '完全ローカル処理 · 画像は端末から送信されません',
+          'ここから、ピクセルを整える。',
+        ]) {
+          expect(find.text(text), findsNothing);
+        }
+        final convertPosition = tester.getRect(
+          find.byKey(const Key('convert')),
+        );
+        final savePosition = tester.getRect(find.byKey(const Key('save')));
+        expect(convertPosition.top, greaterThanOrEqualTo(0));
+        expect(savePosition.bottom, lessThanOrEqualTo(size.height));
         final shape = find.descendant(
           of: find.byKey(const Key('shapeProtection')),
           matching: find.byType(SegmentedButton<int>),
@@ -33,7 +55,6 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Logical pixels').last);
         await tester.pumpAndSettle();
-        expect(find.text('1セル = 1ピクセルのPNG\n半透明・補間・ディザリングなし'), findsOneWidget);
         expect(
           tester
               .widget<DropdownButtonFormField<OutputMode>>(output)
@@ -46,6 +67,11 @@ void main() {
               .onPressed,
           isNull,
         );
+        expect(
+          tester.getRect(find.byKey(const Key('convert'))),
+          convertPosition,
+        );
+        expect(tester.getRect(find.byKey(const Key('save'))), savePosition);
         expect(
           tester
               .widget<OutlinedButton>(find.byKey(const Key('save')))

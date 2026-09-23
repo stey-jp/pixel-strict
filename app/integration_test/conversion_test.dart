@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:pixelstrict/main.dart';
@@ -69,6 +70,15 @@ void main() {
         tester.widget<Text>(find.byKey(const Key('resultInfo'))).data,
         contains('Grid 32 × 32 cells / 6px'),
       );
+      final info = tester
+          .widget<Text>(find.byKey(const Key('resultInfo')))
+          .data!
+          .split('\n');
+      expect(info, hasLength(3));
+      expect(info[1], startsWith('Grid '));
+      expect(info[2], matches(r'^\d+ ms  ·  \d+候補を評価$'));
+      expect(find.textContaining(' ms'), findsOneWidget);
+      expect(find.text('v0.1.4+5'), findsOneWidget);
       expect(
         tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,
         isNotNull,
@@ -200,7 +210,10 @@ void main() {
         isNull,
       );
       await convert();
-      expect(viewController.value.storage, orderedEquals(beforeModeChange.storage));
+      expect(
+        viewController.value.storage,
+        orderedEquals(beforeModeChange.storage),
+      );
       final output = find.byKey(const Key('outputMode'));
       await tester.ensureVisible(output);
       await tester.tap(output);
@@ -260,4 +273,55 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  const previewPath = String.fromEnvironment('PREVIEW_PATH');
+  if (previewPath.isNotEmpty) {
+    testWidgets('Loaded image renders with fixed actions', (tester) async {
+      final boundary = GlobalKey();
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: boundary,
+          child: const PixelStrictApp(initialPath: previewPath),
+        ),
+      );
+      for (var i = 0; i < 200; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        if (tester
+                .widget<FilledButton>(find.byKey(const Key('convert')))
+                .onPressed !=
+            null) {
+          break;
+        }
+      }
+      await tester.ensureVisible(find.text('32'));
+      await tester.tap(find.text('32'));
+      await tester.tap(find.byKey(const Key('convert')));
+      for (var i = 0; i < 300; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+        if (find.byKey(const Key('resultInfo')).evaluate().isNotEmpty) break;
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('resultInfo')), findsOneWidget);
+      expect(find.text('v0.1.4+5'), findsOneWidget);
+      final convert = tester.getRect(find.byKey(const Key('convert')));
+      final save = tester.getRect(find.byKey(const Key('save')));
+      await tester.ensureVisible(find.byKey(const Key('shapeProtection')));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(find.byKey(const Key('convert'))), convert);
+      expect(tester.getRect(find.byKey(const Key('save'))), save);
+      expect(tester.takeException(), isNull);
+      const screenshot = String.fromEnvironment('SCREENSHOT_PATH');
+      if (screenshot.isNotEmpty) {
+        final image =
+            await (boundary.currentContext!.findRenderObject()
+                    as RenderRepaintBoundary)
+                .toImage();
+        try {
+          final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+          await File(screenshot).writeAsBytes(bytes!.buffer.asUint8List());
+        } finally {
+          image.dispose();
+        }
+      }
+    });
+  }
 }

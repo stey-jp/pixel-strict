@@ -64,6 +64,14 @@ class Workbench extends StatefulWidget {
 }
 
 class _WorkbenchState extends State<Workbench> {
+  late final _version = rootBundle
+      .loadString('pubspec.yaml')
+      .then(
+        (source) => RegExp(
+          r'^version:\s*(\S+)',
+          multiLine: true,
+        ).firstMatch(source)!.group(1)!,
+      );
   final _gridController = TextEditingController(text: '64');
   final _previewController = TransformationController();
   Uint8List? _source;
@@ -166,26 +174,25 @@ class _WorkbenchState extends State<Workbench> {
     await _accept(await file.readAsBytes(), file.name);
   });
 
-  Future<void> _convert() =>
-      _guard('Surface Strict + Edge Strict を処理中', () async {
-        final width = _manual ? int.tryParse(_gridController.text) : null;
-        if (_manual && (width == null || width < 1 || width > _width)) {
-          throw FormatException('Grid幅は1〜$_widthの整数で指定してください。');
-        }
-        final result = await convertImage(
-          _source!,
-          ConversionSettings(
-            outputMode: _outputMode,
-            gridWidth: width,
-            colors: _colors == 0 ? null : _colors,
-            smoothing: _smoothing,
-            edgeProtection: _edge,
-            shapeProtection: _shape,
-            median: _median,
-          ),
-        );
-        if (mounted) setState(() => _result = result);
-      });
+  Future<void> _convert() => _guard('画像を変換中', () async {
+    final width = _manual ? int.tryParse(_gridController.text) : null;
+    if (_manual && (width == null || width < 1 || width > _width)) {
+      throw FormatException('Grid幅は1〜$_widthの整数で指定してください。');
+    }
+    final result = await convertImage(
+      _source!,
+      ConversionSettings(
+        outputMode: _outputMode,
+        gridWidth: width,
+        colors: _colors == 0 ? null : _colors,
+        smoothing: _smoothing,
+        edgeProtection: _edge,
+        shapeProtection: _shape,
+        median: _median,
+      ),
+    );
+    if (mounted) setState(() => _result = result);
+  });
 
   Future<void> _save() => _guard('PNGを保存中', () async {
     final result = _result!;
@@ -215,24 +222,26 @@ class _WorkbenchState extends State<Workbench> {
                 children: [
                   const _PixelMark(),
                   const SizedBox(width: 12),
-                  const Text(
-                    'PixelStrict',
-                    style: TextStyle(
-                      fontSize: 23,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.7,
-                    ),
-                  ),
-                  const Spacer(),
-                  if (constraints.maxWidth > 600)
-                    const Text(
-                      'LOCAL PROCESSING  /  MVP 0.1',
+                  const Expanded(
+                    child: Text(
+                      'PixelStrict',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: _muted,
-                        fontSize: 11,
-                        letterSpacing: 1.4,
+                        fontSize: 23,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.7,
                       ),
                     ),
+                  ),
+                  FutureBuilder<String>(
+                    future: _version,
+                    builder: (context, snapshot) => Text(
+                      snapshot.hasData ? 'v${snapshot.data}' : '',
+                      key: const Key('appVersion'),
+                      style: const TextStyle(color: _muted, fontSize: 11),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -247,9 +256,17 @@ class _WorkbenchState extends State<Workbench> {
                     children: [
                       SizedBox(
                         width: 292,
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.all(24),
-                          child: _settings(),
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: SingleChildScrollView(
+                                key: const Key('settingsScroll'),
+                                padding: const EdgeInsets.all(24),
+                                child: _settings(),
+                              ),
+                            ),
+                            _actions(),
+                          ],
                         ),
                       ),
                       const VerticalDivider(width: 1),
@@ -263,6 +280,7 @@ class _WorkbenchState extends State<Workbench> {
                   );
                 }
                 return SingleChildScrollView(
+                  key: const Key('workbenchScroll'),
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
@@ -275,35 +293,10 @@ class _WorkbenchState extends State<Workbench> {
               },
             ),
           ),
-          Container(
-            decoration: const BoxDecoration(
-              border: Border(top: BorderSide(color: _line)),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            child: Row(
-              children: [
-                Icon(
-                  _busy ? Icons.hourglass_top : Icons.circle,
-                  size: 10,
-                  color: _accent,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _busy ? _activity : '完全ローカル処理 · 画像は端末から送信されません',
-                    style: const TextStyle(color: _muted, fontSize: 11),
-                  ),
-                ),
-                if (_result != null)
-                  Text(
-                    '${_result!.milliseconds.toStringAsFixed(0)} ms',
-                    style: const TextStyle(
-                      fontFeatures: [ui.FontFeature.tabularFigures()],
-                      color: _accent,
-                    ),
-                  ),
-              ],
-            ),
+          LayoutBuilder(
+            builder: (context, constraints) => constraints.maxWidth < 1000
+                ? _actions(horizontal: true)
+                : const SizedBox.shrink(),
           ),
         ],
       ),
@@ -313,11 +306,6 @@ class _WorkbenchState extends State<Workbench> {
   Widget _settings() => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const Text(
-        'RECONSTRUCTION',
-        style: TextStyle(color: _muted, fontSize: 11, letterSpacing: 1.8),
-      ),
-      const SizedBox(height: 22),
       OutlinedButton.icon(
         onPressed: _busy ? null : _pick,
         icon: const Icon(Icons.add_photo_alternate_outlined, size: 19),
@@ -406,28 +394,40 @@ class _WorkbenchState extends State<Workbench> {
         value: _median,
         onChanged: _busy ? null : (v) => _change(() => _median = v),
       ),
-      const SizedBox(height: 24),
-      FilledButton.icon(
-        key: const Key('convert'),
-        onPressed: _source == null || _busy ? null : _convert,
-        icon: const Icon(Icons.auto_fix_high, size: 19),
-        label: Text(_busy ? '処理中…' : 'Strictへ変換'),
-      ),
-      const SizedBox(height: 10),
-      OutlinedButton.icon(
-        key: const Key('save'),
-        onPressed: _result == null || _busy ? null : _save,
-        icon: const Icon(Icons.save_alt, size: 18),
-        label: const Text('PNGを保存'),
-        style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
-      ),
-      const SizedBox(height: 16),
-      Text(
-        '${_outputMode == OutputMode.preserve ? '元解像度のPNG · 均等な整数セル' : '1セル = 1ピクセルのPNG'}\n半透明・補間・ディザリングなし',
-        style: const TextStyle(color: _muted, fontSize: 11, height: 1.7),
-      ),
     ],
   );
+
+  Widget _actions({bool horizontal = false}) {
+    final convert = FilledButton.icon(
+      key: const Key('convert'),
+      onPressed: _source == null || _busy ? null : _convert,
+      icon: const Icon(Icons.auto_fix_high, size: 19),
+      label: Text(_busy ? '処理中…' : 'Strictへ変換'),
+    );
+    final save = OutlinedButton.icon(
+      key: const Key('save'),
+      onPressed: _result == null || _busy ? null : _save,
+      icon: const Icon(Icons.save_alt, size: 18),
+      label: const Text('PNGを保存'),
+      style: OutlinedButton.styleFrom(minimumSize: const Size(48, 48)),
+    );
+    return Padding(
+      key: const Key('fixedActions'),
+      padding: EdgeInsets.all(horizontal ? 16 : 24),
+      child: horizontal
+          ? Row(
+              children: [
+                Expanded(child: convert),
+                const SizedBox(width: 10),
+                Expanded(child: save),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [convert, const SizedBox(height: 10), save],
+            ),
+    );
+  }
 
   String get _gridHint {
     if (_outputMode == OutputMode.logical) return '高さは元画像の比率から決定';
@@ -473,20 +473,6 @@ class _WorkbenchState extends State<Workbench> {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          '曖昧なピクセルを、使える素材へ。',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Surface Strict + Edge Strict',
-          style: TextStyle(color: _muted, fontSize: 13),
-        ),
-        const SizedBox(height: 24),
         if (_error != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 16),
@@ -499,9 +485,22 @@ class _WorkbenchState extends State<Workbench> {
             ),
           ),
         if (_busy)
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: LinearProgressIndicator(minHeight: 2),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Semantics(
+              liveRegion: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _activity,
+                    style: const TextStyle(color: _muted, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(minHeight: 2),
+                ],
+              ),
+            ),
           ),
         if (wide)
           Expanded(child: _previews(true))
@@ -510,22 +509,11 @@ class _WorkbenchState extends State<Workbench> {
             height: _source == null ? 320 : 600,
             child: _previews(false),
           ),
-        const SizedBox(height: 18),
-        Wrap(
-          spacing: 16,
-          runSpacing: 8,
-          children: [
-            const _Badge(Icons.grid_on, '整数グリッド'),
-            const _Badge(Icons.crop_square, 'Nearest Neighbor'),
-            if (_result != null)
-              _Badge(Icons.palette_outlined, '${_result!.colorCount} colors'),
-          ],
-        ),
         if (_result != null)
           Padding(
             padding: const EdgeInsets.only(top: 14),
             child: Text(
-              '${_result!.width} × ${_result!.height} px  ·  ${_result!.milliseconds.toStringAsFixed(0)} ms  ·  ${(_result!.report['candidates'] as List).length}候補を評価\nGrid ${_result!.gridWidth} × ${_result!.gridHeight} cells / ${_result!.cellPitch}px',
+              '${_result!.width} × ${_result!.height} px  ·  ${_result!.colorCount} colors\nGrid ${_result!.gridWidth} × ${_result!.gridHeight} cells / ${_result!.cellPitch}px\n${_result!.milliseconds.toStringAsFixed(0)} ms  ·  ${(_result!.report['candidates'] as List).length}候補を評価',
               key: const Key('resultInfo'),
               style: const TextStyle(color: _accent, fontSize: 13),
             ),
@@ -571,8 +559,6 @@ class _WorkbenchState extends State<Workbench> {
                   color: _accent,
                 ),
                 const SizedBox(height: 20),
-                const Text('ここから、ピクセルを整える。', style: TextStyle(fontSize: 18)),
-                const SizedBox(height: 10),
                 Text(
                   Platform.isWindows || Platform.isMacOS
                       ? '画像をドロップ、またはファイルを選択'
@@ -609,7 +595,7 @@ class _WorkbenchState extends State<Workbench> {
           ? '変換待ち'
           : '${_result!.width} × ${_result!.height} px',
       bytes: _result?.png,
-      name: 'STRICT PIXEL ART',
+      name: '${_name.replaceFirst(RegExp(r'\.[^.]+$'), '')}-strict.png',
       accent: true,
     );
     return wide
@@ -746,21 +732,6 @@ class _Checkerboard extends CustomPainter {
 
   @override
   bool shouldRepaint(_Checkerboard oldDelegate) => false;
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge(this.icon, this.label);
-  final IconData icon;
-  final String label;
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, size: 13, color: _muted),
-      const SizedBox(width: 6),
-      Text(label, style: const TextStyle(color: _muted, fontSize: 11)),
-    ],
-  );
 }
 
 class _PixelMark extends StatelessWidget {

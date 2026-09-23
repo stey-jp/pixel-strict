@@ -1,7 +1,7 @@
 name: pixelstrict
 description: Deterministic strict pixel art reconstruction.
 publish_to: none
-version: 0.1.0+1
+version: 0.1.4+5
 environment:
   sdk: ^3.13.0
 dependencies:
@@ -21,4 +21,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
+    - pubspec.yaml
     - assets/branding/pixelstrict-mark.png

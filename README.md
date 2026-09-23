@@ -2,7 +2,7 @@
 
 AI生成の疑似ピクセルアートを、整数グリッド・1セル1色のPNGへ再構成するローカルアプリです。Flutter UI / Rust core / C ABI FFI。OpenAI API・画像生成・OpenCVは使用しません。
 
-Shape protection / Preserve対応のWindows Releaseは`flutter build windows --release`で生成する`app/build/windows/x64/runner/Release/`です。初回MVPのビルド: `output/PixelStrict-windows-x64.zip`、`output/PixelStrict-android-arm64-debug.apk`（今回未更新）。[検証結果](VALIDATION.md)と[比較画像](samples/comparison.png)も参照してください。Windows配布時はexe単体ではなくDLL・dataを含むReleaseフォルダー全体が必要です。
+現在のWindows版は **v0.1.4+5**。右上の表示とexeの製品バージョンは`app/pubspec.yaml`の同じ値を使います。修正を配布する際はこのversionを更新して再ビルドしてください。Releaseは`flutter build windows --release`で生成する`app/build/windows/x64/runner/Release/`です。初回MVPの`output/PixelStrict-windows-x64.zip`、`output/PixelStrict-android-arm64-debug.apk`は旧版です。[検証結果](VALIDATION.md)と[比較画像](samples/comparison.png)も参照してください。Windows配布時はexe単体ではなくDLL・dataを含むReleaseフォルダー全体が必要です。
 
 ## 構成
 
@@ -47,6 +47,8 @@ Developer Modeが無効でプラグインリンクの作成に失敗する場合
 5. Surface smoothing / Edge protection / **Shape protection**を弱・中・強から選択（初期値は中）。Shapeは外形・細線・小形状の保持を調整します。MedianはOff / 半径1px。
 6. 変換後、Before / Afterを比較してPNGを保存。片方をズーム／パンすると、もう片方も同じ倍率・位置に同期します。変換・再変換時は表示位置を保持し、新しい画像を読み込むと全体表示に戻ります。プレビューの拡大表示はNearest Neighborのみ。
 
+変換・保存ボタンは設定のスクロール外に固定しています。横幅1000px以上では左下、それより狭い画面では画面下に表示します。処理時間と評価候補数は画像比較の下、Grid表示の次の行に表示。キャッチフレーズとフッターのステータスバーは廃止しました。
+
 保存PNGは次の2モードから選択できます。
 
 - **Preserve Resolution**（UI: Preserve size、デフォルト）: 元画像と完全に同じwidth / height。決定済みの論理セル色をRustで均等な`P×P`整数矩形へ直接描画します。縮小・拡大APIや補間は使いません。1254×1254・Grid 418なら、3×3pxの単色セルで1254×1254を保存します。
@@ -78,6 +80,8 @@ Preserveでは`source_width % P == 0`かつ`source_height % P == 0`が必須で�
 Autoでは線の中央色・連続性に加え、線幅も元画像と比較します。出力の同色領域を線の両側へ各64セルまで調べ、元画像上の幅へ換算するため、PreserveとLogicalで同じ評価になります。過度に太く／細くなった候補はShapeと境界整合度の加点を下げます。幅のある線には元の幅の25%（整数切り捨て）の境界誤差を許容し、1pxの線には余分な1pxを許容しません。探索上限で両端が不明な場合は確認できた幅による控えめな評価に留めます。
 
 建物向けの保護ボーナス・領域係数・候補評価重みは`core/src/cell.rs`の`ShapeBalance` / `BUILDING`に分離しています。building / character / iconを選ぶプリセットUIは未実装です。新規依存は追加していません。
+
+柱のような広い面同士の直線境界は、細線とは別に元画像の位置を調べます。隣接セルがそれぞれ同じ面を75%以上占め、最大5セル・各3走査線の80%以上で境界位置が一致する場合だけ、セル内で広い側の面の色へ選択を制限します。隣接する細線を面と誤認しない条件を設け、元セルにない色は追加しません。縦横に同じ処理を行い、領域統合による再移動も防ぎます。量子化前から位置が揺れる境界や斜線を一律に直線へ置き換える処理ではありません。
 
 既存Pixel Art Fixer / Pixel Snapperのコードはコピーしていません。正規グリッドへの再構成とSurface Strict / Edge Strict / Shape Strictを独自実装しています。Autoと外形判定は軽量な近似で、物体の意味理解や元グリッドの厳密復元ではありません。量子化や任意のMedianで既に消えた色・細部は後段では復元できません。1セル内に複数の形がある場合は1セル1色の制約が優先されます。非整数拡大、オフセット、密な植物、意図的な色テクスチャはManual GridやShape強・Median Offでも比較してください。JPEGのEXIF回転・ICC色管理・アニメーションの再生はMVP対象外です。
 

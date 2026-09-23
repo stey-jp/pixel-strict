@@ -69,3 +69,23 @@ pub fn vertical_lines(shaded: bool) -> RgbaImage {
     }
     im
 }
+
+pub fn straight_facade() -> RgbaImage {
+    RgbaImage::from_fn(96, 96, |x, y| {
+        if x < 31 {
+            Rgba(if y % 18 < 9 {
+                [112, 80, 56, 255]
+            } else {
+                [88, 64, 48, 255]
+            })
+        } else {
+            let noise = (((x * 73471) ^ (y * 91283)) % 21) as i16 - 10;
+            Rgba([
+                (236 + noise) as u8,
+                (210 + noise) as u8,
+                (174 + noise) as u8,
+                255,
+            ])
+        }
+    })
+}

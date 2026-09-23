@@ -16,6 +16,7 @@ fn main() {
         ("flat-with-noise", shapes::flat_with_noise(), 48),
         ("vertical-boundary", shapes::vertical_lines(false), 24),
         ("vertical-shades", shapes::vertical_lines(true), 24),
+        ("straight-facade", shapes::straight_facade(), 32),
     ] {
         let input = dir.join(format!("{name}-input.png"));
         source.save(&input).unwrap();

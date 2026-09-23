@@ -1,5 +1,22 @@
 # 検証結果
 
+## v0.1.4+5 — 柱の直線境界とUI整理（2026-09-23）
+
+前回の細線補正だけでは、広い柱の側面を行ごとに異なる色・位置で選ぶ問題が残っていました。元画像で確認できる縦横の直線境界をanalyzeで記録し、decideで同じ側の面の色へ候補を制限しました。最大5セル内の3走査線ずつ、最低9点・80%以上の位置一致を要求。隣接セルの75%以上が同じ面であることを確認し、近接した別々の細線をまとめないようにしています。追加状態はセル当たり4 bytes。C ABI・Options・Report形式・描画・依存関係は変更なし。
+
+- ユーザー提供の`original.png`（1254×1254）を、旧`3524a83`と同じAuto / Colors 32 / Smoothing 2 / Edge 2 / Shape 2 / Median Offで比較。両方ともGrid 418×418・P=3。柱と窓枠のギザギザが減ることを拡大比較しました。代表区間（入力x=405..424、y=525..584）の柱の境界は元画像でx=412。P=3の出力ではx=411を期待し、20セル行のうちx=414へずれる行が**12→0**になりました。画像全体の完全復元を示す指標ではありません。元画像・派生比較画像はローカルのみに保存しています。
+- 合成`straight-facade`を追加。色ノイズと横帯があっても、縦横とも境界を一定位置に保持。Preserve / Logical、全画素の単色矩形、同一PNGの決定論性を確認しました。既存houseのPNG goldenと従来5種のShape fixtureの出力PNGは不変。粗い候補の指標が変わるbuilding-likeのJSONと新fixtureを更新しました。
+- UI: 右上は**v0.1.4+5**。同梱pubspecから取得し、Windows exeのFileVersion / ProductVersionとも一致。キャッチフレーズ、冗長なバッジ、フッターステータスバーを削除。変換・保存はスクロール外に固定し、処理時間はGridの直下に1回だけ表示します。
+- `cargo test --release --locked --manifest-path core/Cargo.toml`: **34件成功**。斜線・細線・近接した平行線・交差部・外形・小形状・単独ノイズ・両出力モードの既存回帰も成功。
+- `cargo fmt --manifest-path core/Cargo.toml --check`、`cargo clippy --release --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings`、`flutter analyze --no-pub`: **成功、指摘なし**。
+- `flutter test --no-pub`: **成功**。390×844 / 1280×800 / 1280×600で版表示、文言削除、操作の無効化、設定をスクロールしてもボタン位置が変わらないこととoverflowなしを検証。
+- Windows FFI統合テスト: **2件成功**。既存の変換・保存バイト列・同期preview・設定変更後の無効化に加え、時間表示の順序／重複なし、版表示、実画像の読み込み・変換・固定ボタンを検証。Flutterの実描画をPNGに取得して配置を目視確認。
+- `flutter build windows --release --no-pub`: **成功**。Release同梱DLLが新fixture・既存3fixtureおよび実画像の検証済み出力と一致。実画像でもPreserve出力がLogical出力の3×3単色矩形と全画素一致しました。
+
+同梱DLLで実画像のAuto変換をwarm-up後、旧／新を交互に各5回計測した中央値は**345.8ms→353.9ms（約2.3%増）**。これはローカルのdecode〜PNG encode計測で、マシン負荷による変動があります。
+
+低コントラストの縁、境界付近のハイライト、交差部や密な植物にはまだ揺れが残ります。3pxセルより細い形の再現には制約があり、緩い斜線や入力自体の位置の揺れをすべて補正するものではありません。次の改善候補は、元画像の明度境界を参照した量子化前の位置検出と、実画像での境界位置保持率の評価です。Android / macOS / iOSは今回再ビルド・実機検証していません。以下は過去版の検証履歴です。
+
 ## 縦線の幅・位置・連続性の改善（2026-09-23）
 
 セル境界にかかった縦線の両側へLINE加点が入り、行ごとに幅が1〜2セルへ変わる問題と、近い色への変化で同色の連続性が失われる問題を合成fixtureで再現しました。Rust coreのanalyze / decide / evaluate内で対応し、UI・Options・Report形式・C ABI・描画処理・依存関係は変更していません。

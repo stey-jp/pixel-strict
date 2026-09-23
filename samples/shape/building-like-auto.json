@@ -126,19 +126,19 @@
       },
       "metrics": {
         "surface_uniformity": 1.0,
-        "edge_continuity": 0.6862736829991958,
+        "edge_continuity": 0.6977072431078412,
         "isolated_pixels": 0,
-        "source_error": 0.0026145317210143227,
+        "source_error": 0.0027594613056862727,
         "grid_alignment": 0.44579926797918185,
         "silhouette_count": 28,
         "preserved_detail_count": 0,
-        "silhouette_retention": 0.9206349206349206,
+        "silhouette_retention": 0.7777777777777778,
         "line_continuity_retention": 0.0,
         "line_width_retention": 0.0,
         "small_detail_retention": 0.0,
-        "corner_edge_consistency": 0.427536231884058,
-        "shape_score": 0.3863526570048309,
-        "score": 0.5148472517461616
+        "corner_edge_consistency": 0.36231884057971014,
+        "shape_score": 0.32657004830917874,
+        "score": 0.4376397755091346
       }
     },
     {
@@ -169,20 +169,20 @@
         "height": 16
       },
       "metrics": {
-        "surface_uniformity": 0.9679012345679012,
-        "edge_continuity": 0.7822135387545835,
+        "surface_uniformity": 0.9678217821782178,
+        "edge_continuity": 0.5989479135367147,
         "isolated_pixels": 0,
-        "source_error": 0.003276941755842393,
+        "source_error": 0.0021218419626558038,
         "grid_alignment": 0.09019246327026305,
         "silhouette_count": 79,
         "preserved_detail_count": 0,
-        "silhouette_retention": 0.8571428571428571,
+        "silhouette_retention": 0.5476190476190477,
         "line_continuity_retention": 0.0,
         "line_width_retention": 0.04678362573099413,
         "small_detail_retention": 0.0,
-        "corner_edge_consistency": 0.17391304347826086,
-        "shape_score": 0.32608695652173914,
-        "score": 0.244825730842201
+        "corner_edge_consistency": 0.1111111111111111,
+        "shape_score": 0.20833333333333334,
+        "score": 0.10367133530815531
       }
     },
     {
@@ -230,7 +230,7 @@
       }
     }
   ],
-  "processing_ms": 2.9959000000000002,
+  "processing_ms": 2.7999,
   "options": {
     "output_mode": "preserve",
     "grid_width": null,
