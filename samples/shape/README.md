@@ -9,8 +9,12 @@ cargo run --release --locked --manifest-path core/Cargo.toml --example shape_sam
 - `building-like`: 低コントラストの屋上の縁・柱・窓枠・角、植物、照明、単独ノイズ。
 - `line-heavy`: 高コントラストの縦横線と斜線。Autoで線を失う粗い候補を選ばないことも検証。
 - `flat-with-noise`: 同じ面の単独ノイズ5点と、近似色の2×3セルの小形状。
+- `vertical-boundary`: セル境界をまたぎ位置が1px揺れる縦線3本。
+- `vertical-shades`: 色が途中で変わる細い縦線3本。
 
-`*-input.png`が入力、`*-manual.png`はGrid 48・Preserve・Colors 32・Smoothing 3・Edge 2・Shape 2、`*-auto.png`は同設定でGrid Autoです。対応JSONに候補評価を出力します。画像は48×48で、ManualはP=1。拡大時にも補間しないで比較してください。
+`*-input.png`が入力、`*-manual.png`はPreserve・Colors 32・Smoothing 3・Edge 2・Shape 2、`*-auto.png`は同設定でGrid Autoです。対応JSONに候補評価を出力します。最初の3例は48×48・Manual Grid 48（P=1）。`vertical-*`は96×96・Manual Grid 24（P=4）。拡大時にも補間しないで比較してください。
+
+`vertical-boundary`のManualは旧`2b2a967`で左右に余分なセルが生じましたが、直線の位置調整後は3本とも20セルにわたって一定の位置・1セル幅を保持。`vertical-shades`では消えていた3本を端点まで保持します。横線への90度回転、両出力モード、単色矩形と決定論性もテストします。P=4のため2pxの入力線も出力は4px幅です。AutoがP=1を選ぶ場合は元の揺れも保持し、任意の画像の線をすべて直線化する処理ではありません。
 
 線幅評価の追加後、`line-heavy`のAutoは旧`672740c`のGrid 12（P=4）からGrid 48（P=1）へ変更。縦横の1px線と斜線の太さ・位置が入力と一致します。両解像度モードで1/2/4倍入力と上下反転を回帰テストし、拡大済みの線を不要に細くしないことも確認しています。各候補の`metrics.line_width_retention`で線幅保持率を確認できます。
 

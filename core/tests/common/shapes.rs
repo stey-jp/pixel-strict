@@ -55,3 +55,17 @@ pub fn flat_with_noise() -> RgbaImage {
     }
     im
 }
+
+pub fn vertical_lines(shaded: bool) -> RgbaImage {
+    let mut im = RgbaImage::from_pixel(96, 96, Rgba([200, 184, 160, 255]));
+    for y in 8..88 {
+        for base in [21, 43, 67] {
+            let start = base + u32::from(!shaded && y % 12 < 4);
+            let shade = if shaded { (y / 4 % 3) as u8 * 16 } else { 0 };
+            for x in start..start + 2 {
+                im.put_pixel(x, y, Rgba([24 + shade, 28 + shade, 32 + shade, 255]));
+            }
+        }
+    }
+    im
+}

@@ -1,5 +1,30 @@
 # 検証結果
 
+## 縦線の幅・位置・連続性の改善（2026-09-23）
+
+セル境界にかかった縦線の両側へLINE加点が入り、行ごとに幅が1〜2セルへ変わる問題と、近い色への変化で同色の連続性が失われる問題を合成fixtureで再現しました。Rust coreのanalyze / decide / evaluate内で対応し、UI・Options・Report形式・C ABI・描画処理・依存関係は変更していません。
+
+- 元画像で境界に接する細線について、線方向の最大5セルの占有量から配置先を決めます。3セル以上の直線の支持と2か所以上の境界接続を要求し、離れた平行線・太い柱・交差部の統合を避けます。縦横に同じ規則を使い、斜線の位置をそろえる処理は追加していません。
+- 背景との色差の1/8以内、かつOKLab二乗距離0.02以内の色を線の支持候補にします。隣セルに同じ色がなく、同方向の細線がある場合だけ補助し、広い面の色は支持に使いません。出力色は各セルに実在する色から選びます。半セル幅の直線は高コントラストの場合のみLINE判定を補強し、端点も保持します。
+- `vertical-boundary`（96×96、Grid 24、P=4、Colors 32、Smoothing 3）では、旧`2b2a967`の余分な線セル24個が0個へ。3本×20セルを一定の位置・幅で保持します。`vertical-shades`では旧版で消えた3本×20セルを端点まで保持。入力線は2pxなので、P=4での最小出力幅は4pxです。
+- 既存houseのAuto / Surface弱 / Surface強のPNGは**直前版とバイト単位で一致**。Autoは32×32・11色、Manualは弱24色／強20色、RGB MAEは3.113／3.255／3.258を維持。既存3種のShape fixtureのPNGも不変。JSON reportと比較資料は再生成しました。
+- `cargo test --release --locked --manifest-path core/Cargo.toml`: **33件成功**。追加2件で幅・位置・色変化・端点・横方向への回転・離れた平行線・太い柱・交差部を検証。Preserveの全セルが単色矩形、Logicalの対応、同一PNGの決定論性も確認。既存の斜線・外形・小形状・単独ノイズ・197/1254px非整数拡大のAuto回帰も成功。
+- `cargo clippy --release --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings`、`cargo fmt --manifest-path core/Cargo.toml --check`、`flutter analyze --no-pub`: **成功、指摘なし**。
+- Windows FFI統合テスト: **成功**。変換、両出力モード、Report読取、同期preview、設定変更後の結果無効化、再変換と保存を確認。
+- `flutter build windows --release --no-pub`: **成功**。同梱DLLを直接C ABIで呼び、縦線2fixtureのPreserve / Logical両方で20行にわたる一定の幅・位置・連続性を確認。Preserveは生成済みfixtureの全画素とも一致。成果物は`app/build/windows/x64/runner/Release/`です。
+
+同じhouse画像を旧`2b2a967`／新Release同梱DLLへ渡し、warm-up後に実行順を交互にして各5回計測した中央値（decode〜PNG encode）:
+
+| 入力・設定 | 直前版 | 縦線改善後 |
+| --- | ---: | ---: |
+| 192×192・Auto Logical | 39.2ms | 45.7ms |
+| 1254×1254・Auto Logical | 150.2ms | 160.7ms |
+| 1254×1254・Preserve Grid 418・Colors 24・Smoothing 3 | 213.1ms | 230.7ms |
+
+1254版はNearest Neighborで拡大した入力です。この範囲で約7〜17%の処理時間増があり、元のShape protectionによるコスト増も引き続き存在します。サンプルJSONの時間は並行ビルド中の単発値であり、この比較計測とは別です。
+
+追加状態はセルごとの境界色ビット集合4個（16 bytes）。色の候補集合は最大32色、直線の比較は最大5セルで、反復的な画像平滑化や補間は行いません。AutoがP=1を選ぶ場合は入力の位置の揺れも保持します。低コントラストで複数の色が混ざる線、実際の建物画像、緩い傾きや密な植物での誤判定は引き続き検証が必要です。Android / macOS / iOSの再ビルド・実機検証は未実施。
+
 ## Auto Gridの線幅保護（2026-09-23、Shape protection追加後）
 
 線の中心と背景が残っていれば、線が太くなっても連続性の保持と判定されていた問題を修正。既存の元画像プローブに線幅を記録し、候補の実出力と元画像座標で比較する`line_width_retention`を追加しました。shape scoreの線項目とalignment加点に反映し、分類・色決定・描画・C ABI・設定UIは変更していません。新規依存なし。

@@ -2,7 +2,7 @@
   "auto": {
     "rgb_mae": 3.113,
     "colors": 11,
-    "ms": 49.87,
+    "ms": 97.92,
     "grid": {
       "width": 32,
       "height": 32
@@ -11,7 +11,7 @@
   "surface-weak": {
     "rgb_mae": 3.255,
     "colors": 24,
-    "ms": 4.16,
+    "ms": 9.59,
     "grid": {
       "width": 32,
       "height": 32
@@ -20,7 +20,7 @@
   "surface-strong": {
     "rgb_mae": 3.258,
     "colors": 20,
-    "ms": 4.27,
+    "ms": 7.88,
     "grid": {
       "width": 32,
       "height": 32

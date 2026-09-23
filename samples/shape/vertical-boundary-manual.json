@@ -1,0 +1,71 @@
+{
+  "source_width": 96,
+  "source_height": 96,
+  "grid": {
+    "width": 24,
+    "height": 24
+  },
+  "output_mode": "preserve",
+  "output_width": 96,
+  "output_height": 96,
+  "cell_pitch": 4,
+  "palette": [
+    [
+      200,
+      184,
+      160,
+      255
+    ],
+    [
+      24,
+      28,
+      32,
+      255
+    ]
+  ],
+  "classes": [
+    490,
+    0,
+    0,
+    0,
+    86
+  ],
+  "silhouette_count": 86,
+  "preserved_detail_count": 0,
+  "line_continuity_score": 0.18958180484225973,
+  "shape_score": 0.3514908145440123,
+  "candidates": [
+    {
+      "grid": {
+        "width": 24,
+        "height": 24
+      },
+      "metrics": {
+        "surface_uniformity": 1.0,
+        "edge_continuity": 0.9581478188097347,
+        "isolated_pixels": 0,
+        "source_error": 0.024048217054870393,
+        "grid_alignment": 0.46153846153846134,
+        "silhouette_count": 86,
+        "preserved_detail_count": 0,
+        "silhouette_retention": 0.6853932584269663,
+        "line_continuity_retention": 0.18958180484225973,
+        "line_width_retention": 0.24822695035460973,
+        "small_detail_retention": 0.1111111111111111,
+        "corner_edge_consistency": 0.5017543859649123,
+        "shape_score": 0.3514908145440123,
+        "score": 0.15619226915093437
+      }
+    }
+  ],
+  "processing_ms": 1.8278999999999999,
+  "options": {
+    "output_mode": "preserve",
+    "grid_width": 24,
+    "colors": 32,
+    "smoothing": 3,
+    "edge_protection": 2,
+    "shape_protection": 2,
+    "median": false
+  }
+}

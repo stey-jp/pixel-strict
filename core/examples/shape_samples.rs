@@ -10,14 +10,16 @@ fn main() {
             .unwrap_or_else(|| "samples/shape".into()),
     );
     fs::create_dir_all(&dir).unwrap();
-    for (name, source) in [
-        ("building-like", shapes::building_like()),
-        ("line-heavy", shapes::line_heavy()),
-        ("flat-with-noise", shapes::flat_with_noise()),
+    for (name, source, manual_width) in [
+        ("building-like", shapes::building_like(), 48),
+        ("line-heavy", shapes::line_heavy(), 48),
+        ("flat-with-noise", shapes::flat_with_noise(), 48),
+        ("vertical-boundary", shapes::vertical_lines(false), 24),
+        ("vertical-shades", shapes::vertical_lines(true), 24),
     ] {
         let input = dir.join(format!("{name}-input.png"));
         source.save(&input).unwrap();
-        for (suffix, grid_width) in [("manual", Some(48)), ("auto", None)] {
+        for (suffix, grid_width) in [("manual", Some(manual_width)), ("auto", None)] {
             let result = convert(
                 &fs::read(&input).unwrap(),
                 &Options {

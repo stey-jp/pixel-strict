@@ -114,6 +114,107 @@ fn minority_line_including_endpoints_survives_integer_cells() {
 }
 
 #[test]
+fn straight_subcell_lines_do_not_grow_teeth_or_break_at_shade_changes() {
+    for shaded in [false, true] {
+        let reference = shapes::vertical_lines(shaded);
+        for horizontal in [false, true] {
+            let source = if horizontal {
+                image::imageops::rotate90(&reference)
+            } else {
+                reference.clone()
+            };
+            for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+                let result = convert(
+                    &encode(&source),
+                    &Options {
+                        output_mode,
+                        ..settings(24)
+                    },
+                )
+                .unwrap();
+                let out = decoded(&result.png);
+                let out = if horizontal {
+                    image::imageops::rotate270(&out)
+                } else {
+                    out
+                };
+                let pitch = if output_mode == OutputMode::Preserve {
+                    4
+                } else {
+                    1
+                };
+                let mut columns = None;
+                for y in 2..22 {
+                    let ink: Vec<_> = (0..24)
+                        .filter(|x| out.get_pixel(x * pitch, y * pitch)[0] < 100)
+                        .collect();
+                    assert_eq!(
+                        ink.len(),
+                        3,
+                        "shaded {shaded}, horizontal {horizontal}, row {y}: {ink:?}"
+                    );
+                    if let Some(expected) = &columns {
+                        assert_eq!(&ink, expected, "line shifted at row {y}");
+                    }
+                    columns = Some(ink);
+                }
+                for y in [0, 1, 22, 23] {
+                    assert!((0..24).all(|x| out.get_pixel(x * pitch, y * pitch)[0] >= 100));
+                }
+                if pitch == 4 {
+                    for (x, y, p) in out.enumerate_pixels() {
+                        assert_eq!(p, out.get_pixel(x / 4 * 4, y / 4 * 4));
+                    }
+                }
+                assert_eq!(
+                    result.png,
+                    convert(&encode(&source), &result.report.options)
+                        .unwrap()
+                        .png
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn straight_alignment_keeps_separate_lines_wide_columns_and_junctions() {
+    let source = RgbaImage::from_fn(96, 96, |x, y| {
+        let ink = (8..88).contains(&y) && ((16..24).contains(&x) || [43, 45, 67, 68].contains(&x))
+            || ((48..52).contains(&y) && (60..76).contains(&x));
+        Rgba(if ink {
+            [24, 28, 32, 255]
+        } else {
+            [200, 184, 160, 255]
+        })
+    });
+    let result = convert(
+        &encode(&source),
+        &Options {
+            output_mode: OutputMode::Logical,
+            ..settings(24)
+        },
+    )
+    .unwrap();
+    let out = decoded(&result.png);
+    for y in 2..22 {
+        for x in [4, 5, 10, 11] {
+            assert!(
+                out.get_pixel(x, y)[0] < 100,
+                "lost separate/wide line at {x}, {y}"
+            );
+        }
+        assert!(
+            [16, 17].into_iter().any(|x| out.get_pixel(x, y)[0] < 100),
+            "junction line broke at {y}"
+        );
+    }
+    for x in 15..19 {
+        assert!(out.get_pixel(x, 12)[0] < 100, "lost crossbar at {x}");
+    }
+}
+
+#[test]
 fn shape_output_remains_deterministic_and_preserve_matches_logical_cells() {
     let input = noisy(&house(), 4);
     let bytes = encode(&input);
