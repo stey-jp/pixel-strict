@@ -41,12 +41,6 @@
       255
     ],
     [
-      155,
-      134,
-      104,
-      255
-    ],
-    [
       44,
       56,
       73,
@@ -92,12 +86,6 @@
       52,
       50,
       55,
-      255
-    ],
-    [
-      81,
-      81,
-      82,
       255
     ],
     [
@@ -147,12 +135,6 @@
       81,
       70,
       255
-    ],
-    [
-      74,
-      75,
-      77,
-      255
     ]
   ],
   "classes": [
@@ -164,8 +146,8 @@
   ],
   "silhouette_count": 209,
   "preserved_detail_count": 43,
-  "line_continuity_score": 0.0028691058777803296,
-  "shape_score": 0.4673965852226316,
+  "line_continuity_score": 0.0032277441125028706,
+  "shape_score": 0.4635705635100993,
   "candidates": [
     {
       "grid": {
@@ -173,24 +155,24 @@
         "height": 32
       },
       "metrics": {
-        "surface_uniformity": 0.7912912912912913,
-        "edge_continuity": 0.9143613592522429,
-        "isolated_pixels": 56,
-        "source_error": 0.0006226322931635369,
+        "surface_uniformity": 0.790108919634972,
+        "edge_continuity": 0.8616074679823946,
+        "isolated_pixels": 57,
+        "source_error": 0.0004527897188176077,
         "grid_alignment": 1.0,
         "silhouette_count": 209,
         "preserved_detail_count": 43,
-        "silhouette_retention": 0.9943502824858758,
-        "line_continuity_retention": 0.0028691058777803296,
-        "line_width_retention": 0.031503481959907105,
-        "small_detail_retention": 0.012987012987012988,
-        "corner_edge_consistency": 0.7783297847172936,
-        "shape_score": 0.4673965852226316,
-        "score": 0.5610503908848833
+        "silhouette_retention": 0.9887005649717514,
+        "line_continuity_retention": 0.0032277441125028706,
+        "line_width_retention": 0.031930581216242454,
+        "small_detail_retention": 0.016233766233766236,
+        "corner_edge_consistency": 0.7616512893304944,
+        "shape_score": 0.4635705635100993,
+        "score": 0.5583582900785282
       }
     }
   ],
-  "processing_ms": 9.5894,
+  "processing_ms": 4.1113,
   "options": {
     "output_mode": "logical",
     "grid_width": 32,

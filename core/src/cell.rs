@@ -207,13 +207,24 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
             .enumerate()
             .any(|(k, &v)| v >= 0.055 && q.distances[k][cell.dominant as usize] > STRAIGHT_CONTRAST)
         {
-            cell.boundary_colors = straight_boundary(i, cell, q, w, h, g);
+            cell.boundary_colors = straight_boundary(i, cell, q, w, h, g, false);
+            if cell.boundary_colors == 0 {
+                cell.boundary_colors = straight_boundary(i, cell, q, w, h, g, true);
+            }
         }
     }
     cells
 }
 
-fn straight_boundary(i: usize, cell: &Cell, q: &Quantized, w: usize, h: usize, g: Grid) -> u32 {
+fn straight_boundary(
+    i: usize,
+    cell: &Cell,
+    q: &Quantized,
+    w: usize,
+    h: usize,
+    g: Grid,
+    source: bool,
+) -> u32 {
     let (gx, gy) = (i % g.width as usize, i / g.width as usize);
     for vertical in [true, false] {
         let (column, row, width, height, columns, rows) = if vertical {
@@ -225,16 +236,41 @@ fn straight_boundary(i: usize, cell: &Cell, q: &Quantized, w: usize, h: usize, g
         if x1 - x0 < 2 || column == 0 || column + 1 == columns {
             continue;
         }
-        let at =
-            |x: usize, y: usize| q.labels[if vertical { y * w + x } else { x * w + y }] as usize;
+        let index = |x: usize, y: usize| if vertical { y * w + x } else { x * w + y };
+        let palette_at = |x, y| q.labels[index(x, y)] as usize;
+        let at = |x, y| {
+            if source {
+                q.source_luma[index(x, y)] as usize
+            } else {
+                palette_at(x, y)
+            }
+        };
+        let distance = |a: usize, b: usize| {
+            if source {
+                (a as f32 - b as f32).powi(2)
+            } else {
+                q.distances[a][b]
+            }
+        };
+        let threshold = if source {
+            24.0 * 24.0
+        } else {
+            STRAIGHT_CONTRAST
+        };
         let mid = (row * height / rows + (row + 1) * height / rows - 1) / 2;
         // Anchor inside the neighboring faces, excluding narrow strokes with
         // the same background on both sides.
         let left = ((column - 1) * width / columns + x0 - 1) / 2;
         let right = (x1 + (column + 2) * width / columns - 1) / 2;
         let (a, b) = (at(left, mid), at(right, mid));
-        let contrast = q.distances[a][b];
-        if contrast <= STRAIGHT_CONTRAST {
+        if source
+            && (q.colors[palette_at(left, mid)][3] == 0 || q.colors[palette_at(right, mid)][3] == 0)
+        {
+            continue;
+        }
+        let contrast = distance(a, b);
+        let palette_contrast = q.distances[palette_at(left, mid)][palette_at(right, mid)];
+        if contrast <= threshold || palette_contrast <= STRAIGHT_CONTRAST {
             continue;
         }
         let tolerance = contrast * 0.25;
@@ -242,7 +278,7 @@ fn straight_boundary(i: usize, cell: &Cell, q: &Quantized, w: usize, h: usize, g
         // nearby thin line. Palette shades are grouped against fixed anchors.
         let broad = |start: usize, end: usize, seed: usize| {
             (start..end)
-                .filter(|&x| q.distances[seed][at(x, mid)] <= tolerance)
+                .filter(|&x| distance(seed, at(x, mid)) <= tolerance)
                 .count()
                 * 4
                 >= (end - start) * 3
@@ -252,14 +288,15 @@ fn straight_boundary(i: usize, cell: &Cell, q: &Quantized, w: usize, h: usize, g
         {
             continue;
         }
-        let agrees = |x, y| {
-            q.distances[a][at(x - 1, y)] <= tolerance && q.distances[b][at(x, y)] <= tolerance
-        };
-        let boundary = (x0 + 1..x1)
+        let agrees =
+            |x, y| distance(a, at(x - 1, y)) <= tolerance && distance(b, at(x, y)) <= tolerance;
+        let search = if source { x0..x1 + 1 } else { x0 + 1..x1 };
+        let boundary = search
             .filter(|&x| agrees(x, mid))
+            .filter(|&x| !source || distance(at(x - 1, mid), at(x, mid)) >= contrast * 0.0625)
             .max_by(|&x, &other| {
-                q.distances[at(x - 1, mid)][at(x, mid)]
-                    .total_cmp(&q.distances[at(other - 1, mid)][at(other, mid)])
+                distance(at(x - 1, mid), at(x, mid))
+                    .total_cmp(&distance(at(other - 1, mid), at(other, mid)))
                     .then_with(|| other.cmp(&x))
             });
         let Some(boundary) = boundary else {
@@ -276,24 +313,49 @@ fn straight_boundary(i: usize, cell: &Cell, q: &Quantized, w: usize, h: usize, g
                 previous = y;
                 total += 1;
                 let (row_a, row_b) = (at(left, y), at(right, y));
-                let row_contrast = q.distances[row_a][row_b];
-                aligned += usize::from(
-                    row_contrast > STRAIGHT_CONTRAST
-                        && q.distances[row_a][at(boundary - 1, y)] <= row_contrast * 0.25
-                        && q.distances[row_b][at(boundary, y)] <= row_contrast * 0.25,
-                );
+                let row_contrast = distance(row_a, row_b);
+                let matches = |x| {
+                    row_contrast > threshold
+                        && distance(row_a, at(x - 1, y)) <= row_contrast * 0.25
+                        && distance(row_b, at(x, y)) <= row_contrast * 0.25
+                        && (!source || distance(at(x - 1, y), at(x, y)) >= row_contrast * 0.0625)
+                };
+                // A blended transition may move by one source pixel as its
+                // brightness varies. It must still round to the same cell side.
+                aligned += usize::from(if source {
+                    (boundary.saturating_sub(1).max(x0)..=(boundary + 1).min(x1)).any(|x| {
+                        (x - x0 >= x1 - x) == (boundary - x0 >= x1 - boundary) && matches(x)
+                    })
+                } else {
+                    matches(boundary)
+                });
             }
         }
         if total < 9 || aligned * 5 < total * 4 {
             continue;
         }
-        let target = if boundary - x0 >= x1 - boundary { a } else { b };
+        let target = palette_at(
+            if boundary - x0 >= x1 - boundary {
+                left
+            } else {
+                right
+            },
+            mid,
+        );
         let mask = (0..q.colors.len())
             .filter(|&k| {
-                cell.coverage[k] >= 0.055 && q.distances[target][k] <= tolerance.min(0.004)
+                cell.coverage[k] >= 0.055
+                    && q.distances[target][k] <= (palette_contrast * 0.25).min(0.004)
             })
             .fold(0, |mask, k| mask | (1 << k));
-        if mask != 0 {
+        // When the whole cell already belongs to this face, leave ordinary
+        // surface merging enabled instead of locking its small color variations.
+        let restricts = cell
+            .coverage
+            .iter()
+            .enumerate()
+            .any(|(k, &v)| v >= 0.055 && mask & (1 << k) == 0);
+        if mask != 0 && (!source || restricts) {
             return mask;
         }
     }

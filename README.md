@@ -2,7 +2,7 @@
 
 AI生成の疑似ピクセルアートを、整数グリッド・1セル1色のPNGへ再構成するローカルアプリです。Flutter UI / Rust core / C ABI FFI。OpenAI API・画像生成・OpenCVは使用しません。
 
-現在のWindows版は **v0.1.4+5**。右上の表示とexeの製品バージョンは`app/pubspec.yaml`の同じ値を使います。修正を配布する際はこのversionを更新して再ビルドしてください。Releaseは`flutter build windows --release`で生成する`app/build/windows/x64/runner/Release/`です。初回MVPの`output/PixelStrict-windows-x64.zip`、`output/PixelStrict-android-arm64-debug.apk`は旧版です。[検証結果](VALIDATION.md)と[比較画像](samples/comparison.png)も参照してください。Windows配布時はexe単体ではなくDLL・dataを含むReleaseフォルダー全体が必要です。
+現在のWindows版は **v0.1.5+6**。右上の表示とexeの製品バージョンは`app/pubspec.yaml`の同じ値を使います。修正を配布する際はこのversionを更新して再ビルドしてください。Releaseは`flutter build windows --release`で生成する`app/build/windows/x64/runner/Release/`です。初回MVPの`output/PixelStrict-windows-x64.zip`、`output/PixelStrict-android-arm64-debug.apk`は旧版です。[検証結果](VALIDATION.md)と[比較画像](samples/comparison.png)も参照してください。Windows配布時はexe単体ではなくDLL・dataを含むReleaseフォルダー全体が必要です。
 
 ## 構成
 
@@ -82,6 +82,8 @@ Autoでは線の中央色・連続性に加え、線幅も元画像と比較し�
 建物向けの保護ボーナス・領域係数・候補評価重みは`core/src/cell.rs`の`ShapeBalance` / `BUILDING`に分離しています。building / character / iconを選ぶプリセットUIは未実装です。新規依存は追加していません。
 
 柱のような広い面同士の直線境界は、細線とは別に元画像の位置を調べます。隣接セルがそれぞれ同じ面を75%以上占め、最大5セル・各3走査線の80%以上で境界位置が一致する場合だけ、セル内で広い側の面の色へ選択を制限します。隣接する細線を面と誤認しない条件を設け、元セルにない色は追加しません。縦横に同じ処理を行い、領域統合による再移動も防ぎます。量子化前から位置が揺れる境界や斜線を一律に直線へ置き換える処理ではありません。
+
+減色後の色だけで境界を確認できない場合は、減色前の明度を補助にします。両面の明度差が24/255を超え、局所的な変化が両面の差の25%以上ある不透明な境界に限定。入力のぼけで境界が1pxずれても、同じ側のセルへ丸められる位置だけを支持として扱います。すでにセル全体が同じ面なら、この補助で色を固定せず通常の面統合を続けます。入力1画素につき1 byte（最大16 MiB）の明度を保持し、補間・色の追加・描画方法の変更は行いません。
 
 既存Pixel Art Fixer / Pixel Snapperのコードはコピーしていません。正規グリッドへの再構成とSurface Strict / Edge Strict / Shape Strictを独自実装しています。Autoと外形判定は軽量な近似で、物体の意味理解や元グリッドの厳密復元ではありません。量子化や任意のMedianで既に消えた色・細部は後段では復元できません。1セル内に複数の形がある場合は1セル1色の制約が優先されます。非整数拡大、オフセット、密な植物、意図的な色テクスチャはManual GridやShape強・Median Offでも比較してください。JPEGのEXIF回転・ICC色管理・アニメーションの再生はMVP対象外です。
 

@@ -86,8 +86,8 @@
   ],
   "silhouette_count": 207,
   "preserved_detail_count": 16,
-  "line_continuity_score": 0.37153033088235293,
-  "shape_score": 0.6497649661852981,
+  "line_continuity_score": 0.37748161764705884,
+  "shape_score": 0.6044320932416084,
   "candidates": [
     {
       "grid": {
@@ -95,42 +95,20 @@
         "height": 32
       },
       "metrics": {
-        "surface_uniformity": 0.9340888756337609,
-        "edge_continuity": 0.9145589218461276,
-        "isolated_pixels": 14,
-        "source_error": 0.0004849138281693082,
+        "surface_uniformity": 0.9329214474845543,
+        "edge_continuity": 0.8590623184690901,
+        "isolated_pixels": 16,
+        "source_error": 0.00037700362840091284,
         "grid_alignment": 0.9985583402790446,
         "silhouette_count": 207,
         "preserved_detail_count": 16,
-        "silhouette_retention": 0.9620938628158845,
-        "line_continuity_retention": 0.37153033088235293,
+        "silhouette_retention": 0.851985559566787,
+        "line_continuity_retention": 0.37748161764705884,
         "line_width_retention": 0.46006535947712424,
         "small_detail_retention": 0.6666666666666666,
-        "corner_edge_consistency": 0.8561354019746121,
-        "shape_score": 0.6497649661852981,
-        "score": 2.1431868863281163
-      }
-    },
-    {
-      "grid": {
-        "width": 96,
-        "height": 96
-      },
-      "metrics": {
-        "surface_uniformity": 0.9877691947565543,
-        "edge_continuity": 0.8627928351057987,
-        "isolated_pixels": 31,
-        "source_error": 0.0003579190566508967,
-        "grid_alignment": 0.8141749757418824,
-        "silhouette_count": 641,
-        "preserved_detail_count": 93,
-        "silhouette_retention": 0.9891696750902527,
-        "line_continuity_retention": 0.4517596602615314,
-        "line_width_retention": 0.5463888888888889,
-        "small_detail_retention": 0.754054054054054,
-        "corner_edge_consistency": 0.5813196643488664,
-        "shape_score": 0.6582690843892652,
-        "score": 2.0348105427231014
+        "corner_edge_consistency": 0.8053596614950634,
+        "shape_score": 0.6044320932416084,
+        "score": 2.1079836804088687
       }
     },
     {
@@ -139,20 +117,42 @@
         "height": 64
       },
       "metrics": {
-        "surface_uniformity": 0.9881879011334153,
-        "edge_continuity": 0.8645188080525946,
-        "isolated_pixels": 15,
-        "source_error": 0.0004589624705979726,
+        "surface_uniformity": 0.9838698837287452,
+        "edge_continuity": 0.7378596876025252,
+        "isolated_pixels": 27,
+        "source_error": 0.00037792086188367474,
         "grid_alignment": 0.860008472759013,
         "silhouette_count": 411,
-        "preserved_detail_count": 38,
-        "silhouette_retention": 0.9927797833935018,
-        "line_continuity_retention": 0.39472049689440997,
-        "line_width_retention": 0.4996078431372549,
-        "small_detail_retention": 0.8,
-        "corner_edge_consistency": 0.9049424071462153,
-        "shape_score": 0.7023759220883024,
-        "score": 2.0159372751288496
+        "preserved_detail_count": 18,
+        "silhouette_retention": 0.8664259927797834,
+        "line_continuity_retention": 0.40467665327000363,
+        "line_width_retention": 0.49947712418300655,
+        "small_detail_retention": 0.34736842105263155,
+        "corner_edge_consistency": 0.795222143864598,
+        "shape_score": 0.5526441225629317,
+        "score": 1.6496232263586874
+      }
+    },
+    {
+      "grid": {
+        "width": 96,
+        "height": 96
+      },
+      "metrics": {
+        "surface_uniformity": 0.9852059870878087,
+        "edge_continuity": 0.7848648197119683,
+        "isolated_pixels": 45,
+        "source_error": 0.0003567232460221072,
+        "grid_alignment": 0.8141749757418824,
+        "silhouette_count": 641,
+        "preserved_detail_count": 43,
+        "silhouette_retention": 0.868231046931408,
+        "line_continuity_retention": 0.4384644493966279,
+        "line_width_retention": 0.5244092508798391,
+        "small_detail_retention": 0.3099099099099099,
+        "corner_edge_consistency": 0.411441554664047,
+        "shape_score": 0.49655952564123984,
+        "score": 1.3573892953378268
       }
     },
     {
@@ -183,20 +183,20 @@
         "height": 38
       },
       "metrics": {
-        "surface_uniformity": 0.9249585406301825,
-        "edge_continuity": 0.8825519363926227,
-        "isolated_pixels": 24,
-        "source_error": 0.004958602367865356,
+        "surface_uniformity": 0.918371480656269,
+        "edge_continuity": 0.7814370313193003,
+        "isolated_pixels": 26,
+        "source_error": 0.00421788685265698,
         "grid_alignment": 0.23897038328081396,
         "silhouette_count": 254,
-        "preserved_detail_count": 29,
-        "silhouette_retention": 0.8393501805054152,
-        "line_continuity_retention": 0.19718926197088277,
-        "line_width_retention": 0.350455182072829,
-        "small_detail_retention": 0.31416666666666665,
-        "corner_edge_consistency": 0.2901835789567207,
-        "shape_score": 0.4208652329657805,
-        "score": 0.3875629811943962
+        "preserved_detail_count": 28,
+        "silhouette_retention": 0.7707581227436823,
+        "line_continuity_retention": 0.17522511150382902,
+        "line_width_retention": 0.3508333333333332,
+        "small_detail_retention": 0.30333333333333334,
+        "corner_edge_consistency": 0.26204146907588594,
+        "shape_score": 0.3881806729741163,
+        "score": 0.32453572576654605
       }
     },
     {
@@ -205,20 +205,20 @@
         "height": 37
       },
       "metrics": {
-        "surface_uniformity": 0.9225043782837128,
-        "edge_continuity": 0.856699830989011,
-        "isolated_pixels": 20,
-        "source_error": 0.005276824915888444,
+        "surface_uniformity": 0.9097921577030212,
+        "edge_continuity": 0.756030557585105,
+        "isolated_pixels": 33,
+        "source_error": 0.004603745467014877,
         "grid_alignment": 0.19670527209661465,
         "silhouette_count": 238,
-        "preserved_detail_count": 27,
-        "silhouette_retention": 0.8321299638989169,
-        "line_continuity_retention": 0.17423678332092332,
-        "line_width_retention": 0.3238986669133728,
-        "small_detail_retention": 0.3774193548387097,
-        "corner_edge_consistency": 0.4344146685472497,
-        "shape_score": 0.4488220771679267,
-        "score": 0.3647577178124119
+        "preserved_detail_count": 26,
+        "silhouette_retention": 0.7509025270758123,
+        "line_continuity_retention": 0.1295606850335071,
+        "line_width_retention": 0.3247530889442655,
+        "small_detail_retention": 0.3634408602150538,
+        "corner_edge_consistency": 0.42682395178869087,
+        "shape_score": 0.41215021908895855,
+        "score": 0.27289873149930394
       }
     },
     {
@@ -227,20 +227,20 @@
         "height": 23
       },
       "metrics": {
-        "surface_uniformity": 0.9128553770086527,
-        "edge_continuity": 0.862716427125051,
+        "surface_uniformity": 0.9140767824497258,
+        "edge_continuity": 0.8203120744544048,
         "isolated_pixels": 20,
-        "source_error": 0.007141861176170565,
+        "source_error": 0.007035729293171452,
         "grid_alignment": 0.2957541360273753,
         "silhouette_count": 177,
         "preserved_detail_count": 15,
-        "silhouette_retention": 0.8267148014440433,
-        "line_continuity_retention": 0.15279799546593484,
-        "line_width_retention": 0.2032855549332468,
+        "silhouette_retention": 0.7166064981949458,
+        "line_continuity_retention": 0.1464503042596349,
+        "line_width_retention": 0.20598787222379938,
         "small_detail_retention": 0.175,
-        "corner_edge_consistency": 0.29187235543018336,
-        "shape_score": 0.3774495214102367,
-        "score": 0.31889369545263385
+        "corner_edge_consistency": 0.2500320553917169,
+        "shape_score": 0.33236717864527954,
+        "score": 0.25080580787381285
       }
     },
     {
@@ -249,20 +249,20 @@
         "height": 27
       },
       "metrics": {
-        "surface_uniformity": 0.9011976047904192,
-        "edge_continuity": 0.8516839433483078,
-        "isolated_pixels": 18,
-        "source_error": 0.00602721353451262,
+        "surface_uniformity": 0.894022891055532,
+        "edge_continuity": 0.7872835700725641,
+        "isolated_pixels": 23,
+        "source_error": 0.0056939091156263345,
         "grid_alignment": 0.17529967710985997,
         "silhouette_count": 170,
         "preserved_detail_count": 16,
-        "silhouette_retention": 0.851985559566787,
-        "line_continuity_retention": 0.13861350894366825,
-        "line_width_retention": 0.2591961306405384,
+        "silhouette_retention": 0.7581227436823105,
+        "line_continuity_retention": 0.12177627480644301,
+        "line_width_retention": 0.2629489588355573,
         "small_detail_retention": 0.17777777777777776,
-        "corner_edge_consistency": 0.2534328745359337,
-        "shape_score": 0.382543858136133,
-        "score": 0.25031806957775626
+        "corner_edge_consistency": 0.26454614723667785,
+        "shape_score": 0.35018672133123396,
+        "score": 0.18801483984488176
       }
     },
     {
@@ -271,24 +271,24 @@
         "height": 19
       },
       "metrics": {
-        "surface_uniformity": 0.9489516864175023,
-        "edge_continuity": 0.9147173667363351,
-        "isolated_pixels": 8,
-        "source_error": 0.007129752598174461,
+        "surface_uniformity": 0.9462169553327257,
+        "edge_continuity": 0.9068950139982278,
+        "isolated_pixels": 7,
+        "source_error": 0.007081491605195754,
         "grid_alignment": 0.26867947226861305,
         "silhouette_count": 115,
         "preserved_detail_count": 11,
-        "silhouette_retention": 0.6841155234657039,
-        "line_continuity_retention": 0.0521147301895965,
-        "line_width_retention": 0.12029313133704188,
+        "silhouette_retention": 0.6624548736462094,
+        "line_continuity_retention": 0.050753524550315995,
+        "line_width_retention": 0.12244999408213993,
         "small_detail_retention": 0.024444444444444442,
-        "corner_edge_consistency": 0.19743602659681644,
-        "shape_score": 0.2758254393163952,
-        "score": 0.11463931591284554
+        "corner_edge_consistency": 0.1935069514406609,
+        "shape_score": 0.26763856801541147,
+        "score": 0.105760284351331
       }
     }
   ],
-  "processing_ms": 97.9221,
+  "processing_ms": 53.0201,
   "options": {
     "output_mode": "logical",
     "grid_width": null,

@@ -258,6 +258,117 @@ fn straight_alignment_keeps_separate_lines_wide_columns_and_junctions() {
 }
 
 #[test]
+fn blended_frame_uses_source_geometry_across_palette_sizes() {
+    let reference = shapes::blended_frame();
+    for horizontal in [false, true] {
+        let input = if horizontal {
+            image::imageops::rotate90(&reference)
+        } else {
+            reference.clone()
+        };
+        for colors in [16, 24, 32] {
+            for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+                let options = Options {
+                    colors: Some(colors),
+                    output_mode,
+                    ..settings(32)
+                };
+                let result = convert(&encode(&input), &options).unwrap();
+                let out = decoded(&result.png);
+                let out = if horizontal {
+                    image::imageops::rotate270(&out)
+                } else {
+                    out
+                };
+                let pitch = if output_mode == OutputMode::Preserve {
+                    3
+                } else {
+                    1
+                };
+                for y in 0..32 {
+                    assert!(
+                        out.get_pixel(10 * pitch, y * pitch)[0] > 200,
+                        "frame expanded into glass at {y}"
+                    );
+                    assert!(
+                        out.get_pixel(11 * pitch, y * pitch)[0] < 120,
+                        "frame erased at {y}"
+                    );
+                }
+                for (x, y, pixel) in out.enumerate_pixels() {
+                    assert_eq!(pixel, out.get_pixel(x / pitch * pitch, y / pitch * pitch));
+                }
+                assert_eq!(result.png, convert(&encode(&input), &options).unwrap().png);
+            }
+        }
+    }
+}
+
+#[test]
+fn source_boundary_guide_keeps_real_steps_and_gaps() {
+    let frame = shapes::blended_frame();
+    for stepped in [false, true] {
+        let input = RgbaImage::from_fn(96, 96, |x, y| {
+            if !stepped && (45..51).contains(&y) && x < 60 {
+                return Rgba([226, 208, 184, 255]);
+            }
+            let shift = if stepped { y / 12 * 3 } else { 0 };
+            *frame.get_pixel(x.saturating_sub(shift), y)
+        });
+        for horizontal in [false, true] {
+            let input = if horizontal {
+                image::imageops::rotate90(&input)
+            } else {
+                input.clone()
+            };
+            let result = convert(&encode(&input), &settings(32)).unwrap();
+            let out = decoded(&result.png);
+            let out = if horizontal {
+                image::imageops::rotate270(&out)
+            } else {
+                out
+            };
+            for y in 0..32 {
+                if !stepped && (15..17).contains(&y) {
+                    assert!(
+                        (0..20).all(|x| out.get_pixel(x * 3, y * 3)[0] > 200),
+                        "bridged a real gap"
+                    );
+                } else {
+                    let edge = 11 + if stepped { y / 4 } else { 0 };
+                    assert!(
+                        out.get_pixel((edge - 2) * 3, y * 3)[0] > 200,
+                        "straightened a step at {y}"
+                    );
+                    assert!(
+                        out.get_pixel((edge + 1) * 3, y * 3)[0] < 130,
+                        "lost a step at {y}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn source_boundary_guide_leaves_flat_background_uniform() {
+    let source = noisy(&house(), 6);
+    let result = convert(&encode(&source), &settings(32)).unwrap();
+    let out = decoded(&result.png);
+    let sky = *out.get_pixel(5 * 6, 16 * 6);
+    // The flat strip next to the building must still merge with the sky.
+    for y in 16..27 {
+        for x in 4..7 {
+            assert_eq!(
+                *out.get_pixel(x * 6, y * 6),
+                sky,
+                "surface speckle at {x}, {y}"
+            );
+        }
+    }
+}
+
+#[test]
 fn shape_output_remains_deterministic_and_preserve_matches_logical_cells() {
     let input = noisy(&house(), 4);
     let bytes = encode(&input);

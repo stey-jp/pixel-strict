@@ -17,6 +17,7 @@ fn main() {
         ("vertical-boundary", shapes::vertical_lines(false), 24),
         ("vertical-shades", shapes::vertical_lines(true), 24),
         ("straight-facade", shapes::straight_facade(), 32),
+        ("blended-frame", shapes::blended_frame(), 32),
     ] {
         let input = dir.join(format!("{name}-input.png"));
         source.save(&input).unwrap();

@@ -35,12 +35,6 @@
       255
     ],
     [
-      155,
-      134,
-      104,
-      255
-    ],
-    [
       44,
       56,
       73,
@@ -83,9 +77,9 @@
       255
     ],
     [
-      81,
-      81,
-      82,
+      34,
+      46,
+      63,
       255
     ],
     [
@@ -123,12 +117,6 @@
       74,
       67,
       255
-    ],
-    [
-      74,
-      75,
-      77,
-      255
     ]
   ],
   "classes": [
@@ -140,8 +128,8 @@
   ],
   "silhouette_count": 209,
   "preserved_detail_count": 43,
-  "line_continuity_score": 0.0005379573520838118,
-  "shape_score": 0.4668831618925599,
+  "line_continuity_score": 0.0007172764694450824,
+  "shape_score": 0.46305421014741743,
   "candidates": [
     {
       "grid": {
@@ -149,24 +137,24 @@
         "height": 32
       },
       "metrics": {
-        "surface_uniformity": 0.9532654284002396,
-        "edge_continuity": 0.8596125877863809,
-        "isolated_pixels": 13,
-        "source_error": 0.0006201893728024078,
+        "surface_uniformity": 0.9506317954745812,
+        "edge_continuity": 0.8068586965165326,
+        "isolated_pixels": 15,
+        "source_error": 0.0004502020977893329,
         "grid_alignment": 1.0,
         "silhouette_count": 209,
         "preserved_detail_count": 43,
-        "silhouette_retention": 0.9943502824858758,
-        "line_continuity_retention": 0.0005379573520838118,
-        "line_width_retention": 0.014724334587858958,
-        "small_detail_retention": 0.003246753246753247,
-        "corner_edge_consistency": 0.7880589070262598,
-        "shape_score": 0.4668831618925599,
-        "score": 0.6183318714046168
+        "silhouette_retention": 0.9887005649717514,
+        "line_continuity_retention": 0.0007172764694450824,
+        "line_width_retention": 0.01510046601022341,
+        "small_detail_retention": 0.006493506493506494,
+        "corner_edge_consistency": 0.7713804116394606,
+        "shape_score": 0.46305421014741743,
+        "score": 0.6146002770822733
       }
     }
   ],
-  "processing_ms": 7.876599999999999,
+  "processing_ms": 4.7971,
   "options": {
     "output_mode": "logical",
     "grid_width": 32,

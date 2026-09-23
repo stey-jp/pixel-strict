@@ -1,26 +1,26 @@
 {
   "auto": {
-    "rgb_mae": 3.113,
+    "rgb_mae": 2.819,
     "colors": 11,
-    "ms": 97.92,
+    "ms": 53.02,
     "grid": {
       "width": 32,
       "height": 32
     }
   },
   "surface-weak": {
-    "rgb_mae": 3.255,
-    "colors": 24,
-    "ms": 9.59,
+    "rgb_mae": 2.725,
+    "colors": 21,
+    "ms": 4.11,
     "grid": {
       "width": 32,
       "height": 32
     }
   },
   "surface-strong": {
-    "rgb_mae": 3.258,
-    "colors": 20,
-    "ms": 7.88,
+    "rgb_mae": 2.725,
+    "colors": 18,
+    "ms": 4.8,
     "grid": {
       "width": 32,
       "height": 32

@@ -18,7 +18,7 @@ void main() {
         expect(find.text('PixelStrict'), findsOneWidget);
         expect(
           tester.widget<Text>(find.byKey(const Key('appVersion'))).data,
-          'v0.1.4+5',
+          'v0.1.5+6',
         );
         for (final text in [
           '曖昧なピクセルを、使える素材へ。',

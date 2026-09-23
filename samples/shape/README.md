@@ -12,6 +12,7 @@ cargo run --release --locked --manifest-path core/Cargo.toml --example shape_sam
 - `vertical-boundary`: セル境界をまたぎ位置が1px揺れる縦線3本。
 - `vertical-shades`: 色が途中で変わる細い縦線3本。
 - `straight-facade`: 左側の横帯と右側の色ノイズに挟まれた、x=31の直線境界。96×96・Manual Grid 32（P=3）。
+- `blended-frame`: ぼけた境界と明暗を含む窓枠、色ノイズ、パレットを共有する色パッチ。96×96・Manual Grid 32（P=3）。
 
 `*-input.png`が入力、`*-manual.png`はPreserve・Colors 32・Smoothing 3・Edge 2・Shape 2、`*-auto.png`は同設定でGrid Autoです。対応JSONに候補評価を出力します。最初の3例は48×48・Manual Grid 48（P=1）。`vertical-*`は96×96・Manual Grid 24（P=4）。拡大時にも補間しないで比較してください。
 
@@ -30,5 +31,7 @@ cargo run --release --locked --manifest-path core/Cargo.toml --example shape_sam
 比較はRGB値と位置の完全一致で集計。高コントラストの線fixtureは旧版でも保持され、新版でも継続します。`core/tests/shape.rs`でさらに透明な突起・少数派の線と端点・8方向の1〜2セル幅の線・2〜6セルの連結形状・Autoの元画像参照評価・両出力モード・決定論性を検証します。
 
 `straight-facade`は、元の境界を3pxグリッド上のx=30へ一定に配置できることを検証します。右側を占める2/3の色を選び、横帯や面のノイズによって行ごとの位置を変えません。縦横、Preserve / Logical、全セルの単色矩形と決定論性を回帰テストしています。
+
+`blended-frame`では、旧v0.1.4+5のManualでガラス側の列に窓枠の中間色が出る行が32行中28行ありました。減色前の明度による補助を加えたv0.1.5+6では0行になり、隣の窓枠も全32行で維持。16 / 24 / 32色、縦横、両出力モードでテストし、入力に加えた本来の段差や6pxの切れ目を消さないことも別テストで確認します。Autoは色パッチの細部も含めて評価し、Grid 96（P=1）を選びます。
 
 fixtureでの結果は実画像全般に対する品質保証ではありません。Medianと量子化による前段の情報損失、1セル1色より細かい形の再現、密な植物や非整数グリッドは引き続き制限があります。

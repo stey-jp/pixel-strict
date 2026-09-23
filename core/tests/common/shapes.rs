@@ -89,3 +89,33 @@ pub fn straight_facade() -> RgbaImage {
         }
     })
 }
+
+pub fn blended_frame() -> RgbaImage {
+    // A shaded mullion with a blended edge. Separate color patches exercise
+    // palette competition; all edge geometry stays fixed before quantization.
+    const PROFILE: [i16; 17] = [
+        210, 130, 43, 56, 52, 67, 85, 84, 85, 87, 79, 63, 67, 55, 90, 191, 214,
+    ];
+    RgbaImage::from_fn(96, 96, |x, y| {
+        if x >= 60 {
+            return Rgba([
+                ((x / 6 * 17 + y / 6 * 23) % 256) as u8,
+                ((x / 6 * 37 + y / 6 * 29) % 256) as u8,
+                ((x / 6 * 47 + y / 6 * 31) % 256) as u8,
+                255,
+            ]);
+        }
+        let value = if (31..48).contains(&x) {
+            PROFILE[(x - 31) as usize]
+        } else {
+            208
+        };
+        let noise = (((x * 73471) ^ (y * 91283)) % 21) as i16 - 10;
+        Rgba([
+            (value + 18 + noise) as u8,
+            (value + noise) as u8,
+            (value - 24 + noise) as u8,
+            255,
+        ])
+    })
+}

@@ -33,6 +33,8 @@ fn bin(p: &[u8; 4]) -> usize {
 pub struct Quantized {
     pub colors: Vec<[u8; 4]>,
     pub labels: Vec<u8>,
+    // Pre-quantization brightness guides geometry without retaining RGBA input.
+    pub source_luma: Vec<u8>,
     pub distances: [[f32; 32]; 32],
 }
 
@@ -158,6 +160,10 @@ pub fn quantize(image: &RgbaImage, requested: Option<u8>) -> Quantized {
     Quantized {
         colors,
         labels,
+        source_luma: image
+            .pixels()
+            .map(|p| ((77 * p[0] as u32 + 150 * p[1] as u32 + 29 * p[2] as u32) >> 8) as u8)
+            .collect(),
         distances,
     }
 }
