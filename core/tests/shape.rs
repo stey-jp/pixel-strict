@@ -394,7 +394,9 @@ fn stroke_tones_follow_source_brightness_without_erasing_lighting_changes() {
             } else {
                 1
             };
-            for y in (4..14).chain(18..28) {
+            // Include both ends and approach the lighting step. Its two boundary
+            // rows still obey geometry protection before tone selection.
+            for y in (2..15).chain(17..30) {
                 let expected = if y < 16 { 80 } else { 112 };
                 for x in 10..14 {
                     assert!(
@@ -441,6 +443,131 @@ fn stroke_tone_selection_keeps_crossbars_and_colored_details() {
     for y in 22..24 {
         let p = out.get_pixel(33, y * 3);
         assert!(p[0] > 140 && p[1] < 90, "lost colored detail at {y}");
+    }
+}
+
+#[test]
+fn endpoint_tones_keep_junctions_gaps_and_small_colored_shapes() {
+    let reference = shapes::interrupted_stroke();
+    for horizontal in [false, true] {
+        let source = if horizontal {
+            image::imageops::rotate90(&reference)
+        } else {
+            reference.clone()
+        };
+        for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+            let options = Options {
+                output_mode,
+                ..settings(32)
+            };
+            let result = convert(&encode(&source), &options).unwrap();
+            let out = decoded(&result.png);
+            let out = if horizontal {
+                image::imageops::rotate270(&out)
+            } else {
+                out
+            };
+            let pitch = if output_mode == OutputMode::Preserve {
+                3
+            } else {
+                1
+            };
+            // A stable tone reaches closer to both the end and the crossbar.
+            for y in (3..8).chain(11..14) {
+                for x in 11..13 {
+                    assert!(
+                        out.get_pixel(x * pitch, y * pitch)[1].abs_diff(80) <= 2,
+                        "wrong tone near junction at {x}, {y}"
+                    );
+                }
+            }
+            for y in 0..32 {
+                for x in 0..20 {
+                    let stroke =
+                        (2..30).contains(&y) && !(23..25).contains(&y) && (10..14).contains(&x);
+                    let crossbar = y == 9 && (8..16).contains(&x);
+                    assert_eq!(
+                        out.get_pixel(x * pitch, y * pitch)[1] < 160,
+                        stroke || crossbar,
+                        "changed geometry at {x}, {y}"
+                    );
+                }
+            }
+            for x in 8..16 {
+                assert!(out.get_pixel(x * pitch, 9 * pitch)[0] < 60);
+            }
+            for y in 19..21 {
+                let color = out.get_pixel(11 * pitch, y * pitch);
+                assert!(color[0] > 140 && color[1] < 90);
+            }
+            for (x, y, pixel) in out.enumerate_pixels() {
+                assert_eq!(pixel, out.get_pixel(x / pitch * pitch, y / pitch * pitch));
+            }
+            assert_eq!(result.png, convert(&encode(&source), &options).unwrap().png);
+        }
+    }
+}
+
+#[test]
+fn tone_support_does_not_skip_short_lighting_bands_or_transparent_gaps() {
+    let reference = shapes::shaded_stroke();
+    for transparent in [false, true] {
+        let mut source = reference.clone();
+        for y in 6..90 {
+            for x in 30..42 {
+                let band = (y - 6) / 6;
+                let color = if band % 2 == 1 && transparent {
+                    Rgba([0, 0, 0, 0])
+                } else {
+                    // Alternate two-cell shadow/light runs, too short for tone support.
+                    *reference.get_pixel(x, 6 + y % 6 + if band % 2 == 1 { 48 } else { 0 })
+                };
+                source.put_pixel(x, y, color);
+            }
+        }
+        for horizontal in [false, true] {
+            let source = if horizontal {
+                image::imageops::rotate90(&source)
+            } else {
+                source.clone()
+            };
+            for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+                let result = convert(
+                    &encode(&source),
+                    &Options {
+                        output_mode,
+                        ..settings(32)
+                    },
+                )
+                .unwrap();
+                let out = decoded(&result.png);
+                let out = if horizontal {
+                    image::imageops::rotate270(&out)
+                } else {
+                    out
+                };
+                let pitch = if output_mode == OutputMode::Preserve {
+                    3
+                } else {
+                    1
+                };
+                for y in 2..30 {
+                    for x in 10..14 {
+                        let pixel = out.get_pixel(x * pitch, y * pitch);
+                        let light = (y - 2) / 2 % 2 == 1;
+                        if transparent {
+                            assert_eq!(
+                                pixel[3],
+                                if light { 0 } else { 255 },
+                                "bridged gap at {x}, {y}"
+                            );
+                        } else {
+                            assert_eq!(pixel[1] > 105, light, "blurred light step at {x}, {y}");
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

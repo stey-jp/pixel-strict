@@ -145,3 +145,23 @@ pub fn shaded_stroke() -> RgbaImage {
         ])
     })
 }
+
+pub fn interrupted_stroke() -> RgbaImage {
+    let mut image = shaded_stroke();
+    for y in 27..30 {
+        for x in 24..48 {
+            image.put_pixel(x, y, Rgba([30, 32, 36, 255]));
+        }
+    }
+    for y in 57..63 {
+        for x in 33..36 {
+            image.put_pixel(x, y, Rgba([164, 62, 48, 255]));
+        }
+    }
+    for y in 69..75 {
+        for x in 30..42 {
+            image.put_pixel(x, y, Rgba([226, 208, 184, 255]));
+        }
+    }
+    image
+}

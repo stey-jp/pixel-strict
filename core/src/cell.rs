@@ -943,32 +943,45 @@ fn coherent_tone(i: usize, cells: &[Cell], q: &Quantized, g: Grid) -> Option<f32
         }
         let mut total = c.source_luma;
         let mut ambiguous = 1;
-        let mut coherent = true;
-        for offset in [-2, -1, 1, 2] {
-            let Some(n) = neighbor(i, dx * offset, dy * offset, g) else {
-                coherent = false;
-                break;
-            };
-            let other = &cells[n];
-            if (other.source_luma - c.source_luma).abs() > 6.0
-                || coverage(other, family) < 0.88
-                || !labels(family).any(|k| {
-                    other.coverage[k] >= 0.1
-                        && other.line[k] >= 0.6
-                        && other.direction[k] == axis as u8
-                })
-            {
-                coherent = false;
-                break;
+        let mut count = 1;
+        let mut stopped = [false; 2];
+        // Keep a centered five-cell window when possible. At an endpoint or a
+        // lighting step, seek the missing support on the same uninterrupted side.
+        // Stop on a brightness/direction change; never skip cells to collect votes.
+        'support: for distance in 1..=4 {
+            for (side, sign) in [-1, 1].into_iter().enumerate() {
+                if stopped[side] {
+                    continue;
+                }
+                let Some(n) = neighbor(i, dx * sign * distance, dy * sign * distance, g) else {
+                    stopped[side] = true;
+                    continue;
+                };
+                let other = &cells[n];
+                if (other.source_luma - c.source_luma).abs() > 6.0
+                    || coverage(other, family) < 0.88
+                    || !labels(family).any(|k| {
+                        other.coverage[k] >= 0.1
+                            && other.line[k] >= 0.6
+                            && other.direction[k] == axis as u8
+                    })
+                {
+                    stopped[side] = true;
+                    continue;
+                }
+                total += other.source_luma;
+                ambiguous += usize::from(
+                    other.boundary_colors == 0
+                        && other.details == 0
+                        && labels(family).filter(|&k| other.coverage[k] >= 0.1).count() >= 3,
+                );
+                count += 1;
+                if count == 5 {
+                    break 'support;
+                }
             }
-            total += other.source_luma;
-            ambiguous += usize::from(
-                other.boundary_colors == 0
-                    && other.details == 0
-                    && labels(family).filter(|&k| other.coverage[k] >= 0.1).count() >= 3,
-            );
         }
-        if coherent && ambiguous >= 3 {
+        if count == 5 && ambiguous >= 3 {
             return Some(total / 5.0);
         }
     }

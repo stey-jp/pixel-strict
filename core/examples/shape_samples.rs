@@ -19,6 +19,7 @@ fn main() {
         ("straight-facade", shapes::straight_facade(), 32),
         ("blended-frame", shapes::blended_frame(), 32),
         ("shaded-stroke", shapes::shaded_stroke(), 32),
+        ("interrupted-stroke", shapes::interrupted_stroke(), 32),
     ] {
         let input = dir.join(format!("{name}-input.png"));
         source.save(&input).unwrap();

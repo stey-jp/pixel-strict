@@ -1,0 +1,405 @@
+{
+  "source_width": 96,
+  "source_height": 96,
+  "grid": {
+    "width": 48,
+    "height": 48
+  },
+  "output_mode": "preserve",
+  "output_width": 96,
+  "output_height": 96,
+  "cell_pitch": 2,
+  "palette": [
+    [
+      226,
+      208,
+      184,
+      255
+    ],
+    [
+      30,
+      32,
+      36,
+      255
+    ],
+    [
+      35,
+      90,
+      239,
+      255
+    ],
+    [
+      116,
+      98,
+      74,
+      255
+    ],
+    [
+      249,
+      51,
+      198,
+      255
+    ],
+    [
+      3,
+      234,
+      90,
+      255
+    ],
+    [
+      252,
+      106,
+      22,
+      255
+    ],
+    [
+      25,
+      34,
+      161,
+      255
+    ],
+    [
+      78,
+      151,
+      50,
+      255
+    ],
+    [
+      193,
+      143,
+      245,
+      255
+    ],
+    [
+      210,
+      180,
+      36,
+      255
+    ],
+    [
+      20,
+      105,
+      6,
+      255
+    ],
+    [
+      223,
+      246,
+      121,
+      255
+    ],
+    [
+      189,
+      11,
+      169,
+      255
+    ],
+    [
+      82,
+      64,
+      40,
+      255
+    ],
+    [
+      141,
+      123,
+      99,
+      255
+    ],
+    [
+      44,
+      68,
+      202,
+      255
+    ],
+    [
+      175,
+      226,
+      114,
+      255
+    ],
+    [
+      105,
+      120,
+      248,
+      255
+    ],
+    [
+      150,
+      155,
+      22,
+      255
+    ],
+    [
+      43,
+      127,
+      31,
+      255
+    ],
+    [
+      26,
+      7,
+      121,
+      255
+    ],
+    [
+      232,
+      73,
+      239,
+      255
+    ],
+    [
+      122,
+      184,
+      77,
+      255
+    ],
+    [
+      164,
+      62,
+      48,
+      255
+    ],
+    [
+      235,
+      10,
+      145,
+      255
+    ],
+    [
+      129,
+      212,
+      117,
+      255
+    ],
+    [
+      230,
+      213,
+      75,
+      255
+    ],
+    [
+      170,
+      114,
+      214,
+      255
+    ],
+    [
+      215,
+      36,
+      192,
+      255
+    ],
+    [
+      98,
+      80,
+      56,
+      255
+    ],
+    [
+      92,
+      98,
+      222,
+      255
+    ]
+  ],
+  "classes": [
+    1043,
+    143,
+    1,
+    0,
+    1117
+  ],
+  "silhouette_count": 481,
+  "preserved_detail_count": 14,
+  "line_continuity_score": 0.3071119133574007,
+  "shape_score": 0.602098957448212,
+  "candidates": [
+    {
+      "grid": {
+        "width": 48,
+        "height": 48
+      },
+      "metrics": {
+        "surface_uniformity": 0.998820406959599,
+        "edge_continuity": 0.9610230187390204,
+        "isolated_pixels": 7,
+        "source_error": 0.001152763005544936,
+        "grid_alignment": 0.7778321862603171,
+        "silhouette_count": 481,
+        "preserved_detail_count": 14,
+        "silhouette_retention": 0.9912280701754386,
+        "line_continuity_retention": 0.3071119133574007,
+        "line_width_retention": 0.33262820512820507,
+        "small_detail_retention": 0.5,
+        "corner_edge_consistency": 0.830152716884935,
+        "shape_score": 0.602098957448212,
+        "score": 1.5009827080644196
+      }
+    },
+    {
+      "grid": {
+        "width": 32,
+        "height": 32
+      },
+      "metrics": {
+        "surface_uniformity": 0.9740591888929485,
+        "edge_continuity": 0.9463500407548946,
+        "isolated_pixels": 1,
+        "source_error": 0.00041013832223676266,
+        "grid_alignment": 0.9259130490567142,
+        "silhouette_count": 323,
+        "preserved_detail_count": 51,
+        "silhouette_retention": 1.0,
+        "line_continuity_retention": 0.21250945775535937,
+        "line_width_retention": 0.33824786324786327,
+        "small_detail_retention": 0.4811320754716981,
+        "corner_edge_consistency": 0.8825654923215899,
+        "shape_score": 0.6001754999442918,
+        "score": 1.4125079725544243
+      }
+    },
+    {
+      "grid": {
+        "width": 96,
+        "height": 96
+      },
+      "metrics": {
+        "surface_uniformity": 0.9853532080362929,
+        "edge_continuity": 1.0,
+        "isolated_pixels": 0,
+        "source_error": 0.0,
+        "grid_alignment": 0.0,
+        "silhouette_count": 983,
+        "preserved_detail_count": 0,
+        "silhouette_retention": 1.0,
+        "line_continuity_retention": 1.0,
+        "line_width_retention": 1.0,
+        "small_detail_retention": 1.0,
+        "corner_edge_consistency": 1.0,
+        "shape_score": 0.9999999999999999,
+        "score": 1.070273641549566
+      }
+    },
+    {
+      "grid": {
+        "width": 16,
+        "height": 16
+      },
+      "metrics": {
+        "surface_uniformity": 1.0,
+        "edge_continuity": 0.9411905560195127,
+        "isolated_pixels": 12,
+        "source_error": 0.003039370918167428,
+        "grid_alignment": 0.7901352708306499,
+        "silhouette_count": 140,
+        "preserved_detail_count": 98,
+        "silhouette_retention": 0.868421052631579,
+        "line_continuity_retention": 0.028506787330316745,
+        "line_width_retention": 0.040384615384615394,
+        "small_detail_retention": 0.0,
+        "corner_edge_consistency": 0.763289995769156,
+        "shape_score": 0.4187862384790818,
+        "score": 0.4997969659256433
+      }
+    },
+    {
+      "grid": {
+        "width": 24,
+        "height": 24
+      },
+      "metrics": {
+        "surface_uniformity": 0.9796533534287868,
+        "edge_continuity": 0.6192611933565273,
+        "isolated_pixels": 13,
+        "source_error": 0.015048568900662454,
+        "grid_alignment": 0.0,
+        "silhouette_count": 247,
+        "preserved_detail_count": 74,
+        "silhouette_retention": 0.6447368421052632,
+        "line_continuity_retention": 0.07458432304038005,
+        "line_width_retention": 0.26468531468531464,
+        "small_detail_retention": 0.3592233009708738,
+        "corner_edge_consistency": 0.3859078590785908,
+        "shape_score": 0.36131114629716565,
+        "score": -0.01241159885174331
+      }
+    },
+    {
+      "grid": {
+        "width": 8,
+        "height": 8
+      },
+      "metrics": {
+        "surface_uniformity": 1.0,
+        "edge_continuity": 0.8463513528490334,
+        "isolated_pixels": 12,
+        "source_error": 0.03672189339977672,
+        "grid_alignment": 0.2020640130646793,
+        "silhouette_count": 48,
+        "preserved_detail_count": 28,
+        "silhouette_retention": 0.37719298245614036,
+        "line_continuity_retention": 0.035164835164835165,
+        "line_width_retention": 0.045299145299145305,
+        "small_detail_retention": 0.0,
+        "corner_edge_consistency": 0.1008869179600887,
+        "shape_score": 0.14762846264692814,
+        "score": -0.412987636337826
+      }
+    },
+    {
+      "grid": {
+        "width": 2,
+        "height": 2
+      },
+      "metrics": {
+        "surface_uniformity": 1.0,
+        "edge_continuity": 1.0,
+        "isolated_pixels": 0,
+        "source_error": 0.06056707827044946,
+        "grid_alignment": 0.0033119399390296204,
+        "silhouette_count": 4,
+        "preserved_detail_count": 4,
+        "silhouette_retention": 0.0,
+        "line_continuity_retention": 0.0,
+        "line_width_retention": 0.004487179487179488,
+        "small_detail_retention": 0.0,
+        "corner_edge_consistency": 0.0,
+        "shape_score": 0.0,
+        "score": -0.46764899918839437
+      }
+    },
+    {
+      "grid": {
+        "width": 4,
+        "height": 4
+      },
+      "metrics": {
+        "surface_uniformity": 1.0,
+        "edge_continuity": 0.9477569280324655,
+        "isolated_pixels": 5,
+        "source_error": 0.05171066120141404,
+        "grid_alignment": 0.03760653519346171,
+        "silhouette_count": 12,
+        "preserved_detail_count": 0,
+        "silhouette_retention": 0.21052631578947367,
+        "line_continuity_retention": 0.09230769230769231,
+        "line_width_retention": 0.02051282051282051,
+        "small_detail_retention": 0.0,
+        "corner_edge_consistency": 0.08130081300813008,
+        "shape_score": 0.0864473798148134,
+        "score": -0.6344552772818977
+      }
+    }
+  ],
+  "processing_ms": 17.2724,
+  "options": {
+    "output_mode": "preserve",
+    "grid_width": null,
+    "colors": 32,
+    "smoothing": 3,
+    "edge_protection": 2,
+    "shape_protection": 2,
+    "median": false
+  }
+}

@@ -225,20 +225,20 @@
         "height": 32
       },
       "metrics": {
-        "surface_uniformity": 0.9858856739590685,
+        "surface_uniformity": 0.9936708860759493,
         "edge_continuity": 0.9734471808140512,
         "isolated_pixels": 0,
-        "source_error": 0.000333181469387475,
+        "source_error": 0.00024438165898988187,
         "grid_alignment": 0.941966196006923,
         "silhouette_count": 300,
         "preserved_detail_count": 48,
         "silhouette_retention": 1.0,
-        "line_continuity_retention": 0.6957894736842105,
+        "line_continuity_retention": 0.6389473684210526,
         "line_width_retention": 1.0,
         "small_detail_retention": 1.0,
-        "corner_edge_consistency": 0.7815198618307426,
-        "shape_score": 0.8759648213798745,
-        "score": 2.8673228532198336
+        "corner_edge_consistency": 0.7789291882556131,
+        "shape_score": 0.8585235887646576,
+        "score": 2.854939998752325
       }
     },
     {
@@ -313,20 +313,20 @@
         "height": 24
       },
       "metrics": {
-        "surface_uniformity": 0.9566761363636364,
-        "edge_continuity": 0.7486730455674186,
-        "isolated_pixels": 8,
-        "source_error": 0.013344719158137903,
+        "surface_uniformity": 0.959915611814346,
+        "edge_continuity": 0.7509534553424709,
+        "isolated_pixels": 4,
+        "source_error": 0.013245979512551761,
         "grid_alignment": 0.0,
         "silhouette_count": 243,
         "preserved_detail_count": 60,
         "silhouette_retention": 0.5555555555555556,
-        "line_continuity_retention": 0.40870616686819833,
+        "line_continuity_retention": 0.43047158403869407,
         "line_width_retention": 1.0,
         "small_detail_retention": 0.7142857142857143,
-        "corner_edge_consistency": 0.27085955719485183,
-        "shape_score": 0.5005423709412746,
-        "score": 0.20484800046116242
+        "corner_edge_consistency": 0.2608969292468019,
+        "shape_score": 0.5055776019002158,
+        "score": 0.2189720500490599
       }
     },
     {
@@ -374,7 +374,7 @@
       }
     }
   ],
-  "processing_ms": 22.4542,
+  "processing_ms": 14.868599999999999,
   "options": {
     "output_mode": "preserve",
     "grid_width": null,
