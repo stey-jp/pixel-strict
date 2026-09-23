@@ -119,3 +119,29 @@ pub fn blended_frame() -> RgbaImage {
         ])
     })
 }
+
+pub fn shaded_stroke() -> RgbaImage {
+    RgbaImage::from_fn(96, 96, |x, y| {
+        if x >= 60 {
+            return Rgba([
+                ((x / 6 * 17 + y / 6 * 23) % 256) as u8,
+                ((x / 6 * 37 + y / 6 * 29) % 256) as u8,
+                ((x / 6 * 47 + y / 6 * 31) % 256) as u8,
+                255,
+            ]);
+        }
+        let value = if (30..42).contains(&x) && (6..90).contains(&y) {
+            // Three nearby tones across the stroke, with a real lighting change.
+            80 + if y >= 48 { 32 } else { 0 } + [-16, 0, 16][x as usize % 3]
+        } else {
+            208
+        };
+        let noise = (((x * 73471) ^ (y * 91283)) % 9) as i16 - 4;
+        Rgba([
+            (value + 18 + noise) as u8,
+            (value + noise) as u8,
+            (value - 24 + noise) as u8,
+            255,
+        ])
+    })
+}

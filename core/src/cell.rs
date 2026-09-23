@@ -22,6 +22,7 @@ pub struct Cell {
     borders: [u32; 4],
     // Allowed source colors on the majority side of a stable straight boundary.
     boundary_colors: u32,
+    source_luma: f32,
     pub dominant: u8,
     pub class: Class,
     // Palette bitsets keep protection bounded to colors actually present in a cell.
@@ -41,6 +42,8 @@ struct ShapeBalance {
     retention_weights: [f64; 4],
     candidate_weight: f64,
     refinement_penalty: f64,
+    tone_error_weight: f32,
+    tone_structure_weight: f32,
 }
 const BUILDING: ShapeBalance = ShapeBalance {
     silhouette: 0.45,
@@ -51,6 +54,8 @@ const BUILDING: ShapeBalance = ShapeBalance {
     retention_weights: [0.35, 0.30, 0.20, 0.15],
     candidate_weight: 1.25,
     refinement_penalty: 0.08,
+    tone_error_weight: 0.25,
+    tone_structure_weight: 0.1,
 };
 
 fn smoothing_factor(c: &Cell) -> f32 {
@@ -96,11 +101,13 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
             let y0 = gy * h / g.height as usize;
             let y1 = (gy + 1) * h / g.height as usize;
             let mut counts = [0u32; 32];
+            let mut luma_sum = 0u64;
             let mut moments = [[0.0f32; 5]; 32];
             for y in y0..y1 {
                 for x in x0..x1 {
                     let k = q.labels[y * w + x] as usize;
                     counts[k] += 1;
+                    luma_sum += q.source_luma[y * w + x] as u64;
                     let rx = (x - x0) as f32;
                     let ry = (y - y0) as f32;
                     let m = &mut moments[k];
@@ -173,6 +180,7 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
                 direction,
                 borders,
                 boundary_colors: 0,
+                source_luma: luma_sum as f32 / total,
                 dominant: dominant as u8,
                 class,
                 silhouette: 0,
@@ -748,6 +756,11 @@ fn straight_spill(
 
 pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
     let shades = line_shades(q);
+    let luma: Vec<_> = q
+        .colors
+        .iter()
+        .map(|c| (77.0 * c[0] as f32 + 150.0 * c[1] as f32 + 29.0 * c[2] as f32) / 256.0)
+        .collect();
     let smooth = [0.0, 0.45, 0.85, 1.2][o.smoothing as usize];
     let protect = [0.0, 0.55, 0.95, 1.35][o.edge_protection as usize];
     let tolerance = [0.0, 0.0007, 0.0018, 0.004][o.smoothing as usize];
@@ -759,7 +772,13 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
         let mut best = c.dominant;
         let mut best_score = f32::NEG_INFINITY;
         let effective_smoothing = smooth * smoothing_factor(c);
-        for k in 0..q.colors.len() {
+        let tone = coherent_tone(i, cells, q, g);
+        let structure_weight = if tone.is_some() {
+            BUILDING.tone_structure_weight
+        } else {
+            1.0
+        };
+        for (k, &candidate_luma) in luma.iter().enumerate() {
             if c.boundary_colors != 0 && c.boundary_colors & (1 << k) == 0 {
                 continue;
             }
@@ -818,8 +837,9 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
             };
             let score = c.coverage[k] * coverage_weight
                 + continuity * (0.12 + effective_smoothing)
-                + edge * protect * edge_weight
+                + edge * protect * edge_weight * structure_weight
                 + shape
+                    * structure_weight
                     * (if c.lines & (1 << k) != 0 {
                         BUILDING.line * edge
                     } else {
@@ -834,6 +854,9 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
                         0.0
                     })
                 - isolated * effective_smoothing * 0.20
+                - tone.map_or(0.0, |value| {
+                    (candidate_luma - value).abs() * BUILDING.tone_error_weight
+                })
                 - variation;
             if score > best_score {
                 best_score = score;
@@ -891,6 +914,65 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
         }
     }
     output
+}
+
+// Three competing shades of a continuous stroke must not receive more weight
+// than the source brightness merely because one forms a thin stripe in a cell.
+fn coherent_tone(i: usize, cells: &[Cell], q: &Quantized, g: Grid) -> Option<f32> {
+    let c = &cells[i];
+    if c.boundary_colors != 0 || c.details != 0 || c.coverage[c.dominant as usize] > 0.75 {
+        return None;
+    }
+    let mask: u32 = (0..q.colors.len())
+        .filter(|&k| c.coverage[k] >= 0.1)
+        .fold(0, |mask, k| mask | (1 << k));
+    if mask.count_ones() < 3
+        || coverage(c, mask) < 0.88
+        || (0..q.colors.len()).any(|k| c.coverage[k] > 0.0 && q.colors[k][3] == 0)
+        || labels(mask)
+            .any(|a| q.colors[a][3] == 0 || labels(mask).any(|b| q.distances[a][b] > 0.018))
+    {
+        return None;
+    }
+    let family = (0..q.colors.len())
+        .filter(|&k| q.distances[c.dominant as usize][k] <= 0.018)
+        .fold(0, |mask, k| mask | (1 << k));
+    for (axis, &(dx, dy)) in AXES[..2].iter().enumerate() {
+        if !labels(mask).any(|k| c.line[k] >= 0.6 && c.direction[k] == axis as u8) {
+            continue;
+        }
+        let mut total = c.source_luma;
+        let mut ambiguous = 1;
+        let mut coherent = true;
+        for offset in [-2, -1, 1, 2] {
+            let Some(n) = neighbor(i, dx * offset, dy * offset, g) else {
+                coherent = false;
+                break;
+            };
+            let other = &cells[n];
+            if (other.source_luma - c.source_luma).abs() > 6.0
+                || coverage(other, family) < 0.88
+                || !labels(family).any(|k| {
+                    other.coverage[k] >= 0.1
+                        && other.line[k] >= 0.6
+                        && other.direction[k] == axis as u8
+                })
+            {
+                coherent = false;
+                break;
+            }
+            total += other.source_luma;
+            ambiguous += usize::from(
+                other.boundary_colors == 0
+                    && other.details == 0
+                    && labels(family).filter(|&k| other.coverage[k] >= 0.1).count() >= 3,
+            );
+        }
+        if coherent && ambiguous >= 3 {
+            return Some(total / 5.0);
+        }
+    }
+    None
 }
 
 #[derive(Debug, Clone, Serialize)]

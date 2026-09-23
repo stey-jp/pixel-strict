@@ -369,6 +369,82 @@ fn source_boundary_guide_leaves_flat_background_uniform() {
 }
 
 #[test]
+fn stroke_tones_follow_source_brightness_without_erasing_lighting_changes() {
+    let source = shapes::shaded_stroke();
+    for horizontal in [false, true] {
+        let input = if horizontal {
+            image::imageops::rotate90(&source)
+        } else {
+            source.clone()
+        };
+        for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+            let options = Options {
+                output_mode,
+                ..settings(32)
+            };
+            let result = convert(&encode(&input), &options).unwrap();
+            let out = decoded(&result.png);
+            let out = if horizontal {
+                image::imageops::rotate270(&out)
+            } else {
+                out
+            };
+            let pitch = if output_mode == OutputMode::Preserve {
+                3
+            } else {
+                1
+            };
+            for y in (4..14).chain(18..28) {
+                let expected = if y < 16 { 80 } else { 112 };
+                for x in 10..14 {
+                    assert!(
+                        out.get_pixel(x * pitch, y * pitch)[1].abs_diff(expected) <= 2,
+                        "wrong stroke tone at {x}, {y}"
+                    );
+                }
+            }
+            // Tone selection cannot change the stroke width, ends or light step.
+            for y in 0..32 {
+                for x in 0..20 {
+                    let in_stroke = (2..30).contains(&y) && (10..14).contains(&x);
+                    assert_eq!(out.get_pixel(x * pitch, y * pitch)[1] < 160, in_stroke);
+                }
+            }
+            assert!(out.get_pixel(11 * pitch, 15 * pitch)[1] < 105);
+            assert!(out.get_pixel(11 * pitch, 16 * pitch)[1] > 105);
+            for (x, y, pixel) in out.enumerate_pixels() {
+                assert_eq!(pixel, out.get_pixel(x / pitch * pitch, y / pitch * pitch));
+            }
+            assert_eq!(result.png, convert(&encode(&input), &options).unwrap().png);
+        }
+    }
+}
+
+#[test]
+fn stroke_tone_selection_keeps_crossbars_and_colored_details() {
+    let mut source = shapes::shaded_stroke();
+    for y in 27..30 {
+        for x in 24..48 {
+            source.put_pixel(x, y, Rgba([30, 32, 36, 255]));
+        }
+    }
+    for y in 66..72 {
+        for x in 33..36 {
+            source.put_pixel(x, y, Rgba([164, 62, 48, 255]));
+        }
+    }
+    let result = convert(&encode(&source), &settings(32)).unwrap();
+    let out = decoded(&result.png);
+    for x in 8..16 {
+        assert!(out.get_pixel(x * 3, 27)[0] < 60, "lost crossbar at {x}");
+    }
+    for y in 22..24 {
+        let p = out.get_pixel(33, y * 3);
+        assert!(p[0] > 140 && p[1] < 90, "lost colored detail at {y}");
+    }
+}
+
+#[test]
 fn shape_output_remains_deterministic_and_preserve_matches_logical_cells() {
     let input = noisy(&house(), 4);
     let bytes = encode(&input);
