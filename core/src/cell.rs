@@ -22,6 +22,7 @@ pub struct Cell {
     borders: [u32; 4],
     // Allowed source colors on the majority side of a stable straight boundary.
     boundary_colors: u32,
+    boundary_luma: f32,
     source_luma: f32,
     pub dominant: u8,
     pub class: Class,
@@ -180,6 +181,7 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
                 direction,
                 borders,
                 boundary_colors: 0,
+                boundary_luma: 0.0,
                 source_luma: luma_sum as f32 / total,
                 dominant: dominant as u8,
                 class,
@@ -215,9 +217,11 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
             .enumerate()
             .any(|(k, &v)| v >= 0.055 && q.distances[k][cell.dominant as usize] > STRAIGHT_CONTRAST)
         {
-            cell.boundary_colors = straight_boundary(i, cell, q, w, h, g, false);
+            (cell.boundary_colors, cell.boundary_luma) =
+                straight_boundary(i, cell, q, w, h, g, false);
             if cell.boundary_colors == 0 {
-                cell.boundary_colors = straight_boundary(i, cell, q, w, h, g, true);
+                (cell.boundary_colors, cell.boundary_luma) =
+                    straight_boundary(i, cell, q, w, h, g, true);
             }
         }
     }
@@ -232,7 +236,7 @@ fn straight_boundary(
     h: usize,
     g: Grid,
     source: bool,
-) -> u32 {
+) -> (u32, f32) {
     let (gx, gy) = (i % g.width as usize, i / g.width as usize);
     for vertical in [true, false] {
         let (column, row, width, height, columns, rows) = if vertical {
@@ -350,7 +354,7 @@ fn straight_boundary(
             },
             mid,
         );
-        let mask = (0..q.colors.len())
+        let mask: u32 = (0..q.colors.len())
             .filter(|&k| {
                 cell.coverage[k] >= 0.055
                     && q.distances[target][k] <= (palette_contrast * 0.25).min(0.004)
@@ -364,10 +368,27 @@ fn straight_boundary(
             .enumerate()
             .any(|(k, &v)| v >= 0.055 && mask & (1 << k) == 0);
         if mask != 0 && (!source || restricts) {
-            return mask;
+            if mask.count_ones() == 1 {
+                return (mask, 0.0);
+            }
+            // Measure only the selected face inside this cell. Averaging the
+            // opposite face as well would bias its tone toward the background.
+            let (start, end) = if boundary - x0 >= x1 - boundary {
+                (x0, boundary)
+            } else {
+                (boundary, x1)
+            };
+            let (y0, y1) = (row * height / rows, (row + 1) * height / rows);
+            let mut sum = 0u64;
+            for y in y0..y1 {
+                for x in start..end {
+                    sum += q.source_luma[index(x, y)] as u64;
+                }
+            }
+            return (mask, sum as f32 / ((end - start) * (y1 - y0)) as f32);
         }
     }
-    0
+    (0, 0.0)
 }
 
 fn protect_silhouettes(cells: &mut [Cell], q: &Quantized, g: Grid) {
@@ -772,7 +793,7 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
         let mut best = c.dominant;
         let mut best_score = f32::NEG_INFINITY;
         let effective_smoothing = smooth * smoothing_factor(c);
-        let tone = coherent_tone(i, cells, q, g);
+        let tone = boundary_tone(c, q, &luma).or_else(|| coherent_tone(i, cells, q, g));
         let structure_weight = if tone.is_some() {
             BUILDING.tone_structure_weight
         } else {
@@ -914,6 +935,39 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
         }
     }
     output
+}
+
+// Geometry already restricts choices to one face. Resolve competing close
+// shades using that face's source brightness without admitting colors across it.
+fn boundary_tone(c: &Cell, q: &Quantized, luma: &[f32]) -> Option<f32> {
+    if c.boundary_colors.count_ones() < 2
+        || c.details != 0
+        || (0..q.colors.len()).any(|k| c.coverage[k] > 0.0 && q.colors[k][3] == 0)
+        || labels(c.boundary_colors).any(|a| {
+            q.colors[a][3] == 0 || labels(c.boundary_colors).any(|b| q.distances[a][b] > 0.004)
+        })
+    {
+        return None;
+    }
+    let (mut nearest, mut next) = (f32::INFINITY, f32::INFINITY);
+    let (mut low, mut high) = (f32::INFINITY, f32::NEG_INFINITY);
+    for k in labels(c.boundary_colors) {
+        low = low.min(luma[k]);
+        high = high.max(luma[k]);
+        let error = (luma[k] - c.boundary_luma).abs();
+        if error < nearest {
+            next = nearest;
+            nearest = error;
+        } else {
+            next = next.min(error);
+        }
+    }
+    // Near a palette midpoint, noise must not flip an otherwise stable shade.
+    // Leave subtle surface shades and ambiguous choices to the existing score.
+    if high - low < 10.0 || next - nearest < 4.0 {
+        return None;
+    }
+    Some(c.boundary_luma)
 }
 
 // Three competing shades of a continuous stroke must not receive more weight

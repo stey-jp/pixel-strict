@@ -394,9 +394,8 @@ fn stroke_tones_follow_source_brightness_without_erasing_lighting_changes() {
             } else {
                 1
             };
-            // Include both ends and approach the lighting step. Its two boundary
-            // rows still obey geometry protection before tone selection.
-            for y in (2..15).chain(17..30) {
+            // Tone selection now includes the two geometry-protected boundary rows.
+            for y in 2..30 {
                 let expected = if y < 16 { 80 } else { 112 };
                 for x in 10..14 {
                     assert!(
@@ -472,9 +471,9 @@ fn endpoint_tones_keep_junctions_gaps_and_small_colored_shapes() {
             } else {
                 1
             };
-            // A stable tone reaches closer to both the end and the crossbar.
-            for y in (3..8).chain(11..14) {
-                for x in 11..13 {
+            // All four stroke columns retain their tone next to the crossbar.
+            for y in (3..9).chain(10..16) {
+                for x in 10..14 {
                     assert!(
                         out.get_pixel(x * pitch, y * pitch)[1].abs_diff(80) <= 2,
                         "wrong tone near junction at {x}, {y}"
@@ -499,6 +498,52 @@ fn endpoint_tones_keep_junctions_gaps_and_small_colored_shapes() {
             for y in 19..21 {
                 let color = out.get_pixel(11 * pitch, y * pitch);
                 assert!(color[0] > 140 && color[1] < 90);
+            }
+            for (x, y, pixel) in out.enumerate_pixels() {
+                assert_eq!(pixel, out.get_pixel(x / pitch * pitch, y / pitch * pitch));
+            }
+            assert_eq!(result.png, convert(&encode(&source), &options).unwrap().png);
+        }
+    }
+}
+
+#[test]
+fn boundary_midpoint_noise_does_not_create_alternating_shades() {
+    let reference = shapes::boundary_midpoint();
+    for horizontal in [false, true] {
+        let source = if horizontal {
+            image::imageops::rotate90(&reference)
+        } else {
+            reference.clone()
+        };
+        for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+            let options = Options {
+                output_mode,
+                ..settings(32)
+            };
+            let result = convert(&encode(&source), &options).unwrap();
+            let out = decoded(&result.png);
+            let out = if horizontal {
+                image::imageops::rotate270(&out)
+            } else {
+                out
+            };
+            let pitch = if output_mode == OutputMode::Preserve {
+                3
+            } else {
+                1
+            };
+            for y in (0..16).chain(17..32) {
+                let expected = if y < 16 { 144 } else { 176 };
+                assert!(
+                    out.get_pixel(10 * pitch, y * pitch)[1].abs_diff(expected) <= 2,
+                    "midpoint noise changed boundary shade at {y}"
+                );
+            }
+            // Both faces keep their original side, including the lighting step.
+            for y in 0..32 {
+                assert!(out.get_pixel(9 * pitch, y * pitch)[1] < 60);
+                assert!(out.get_pixel(10 * pitch, y * pitch)[1] > 120);
             }
             for (x, y, pixel) in out.enumerate_pixels() {
                 assert_eq!(pixel, out.get_pixel(x / pitch * pitch, y / pitch * pitch));

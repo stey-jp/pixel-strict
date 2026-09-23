@@ -78,7 +78,7 @@ void main() {
       expect(info[1], startsWith('Grid '));
       expect(info[2], matches(r'^\d+ ms  ·  \d+候補を評価$'));
       expect(find.textContaining(' ms'), findsOneWidget);
-      expect(find.text('v0.1.7+8'), findsOneWidget);
+      expect(find.text('v0.1.8+9'), findsOneWidget);
       expect(
         tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,
         isNotNull,
@@ -301,7 +301,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('resultInfo')), findsOneWidget);
-      expect(find.text('v0.1.7+8'), findsOneWidget);
+      expect(find.text('v0.1.8+9'), findsOneWidget);
       final convert = tester.getRect(find.byKey(const Key('convert')));
       final save = tester.getRect(find.byKey(const Key('save')));
       await tester.ensureVisible(find.byKey(const Key('shapeProtection')));

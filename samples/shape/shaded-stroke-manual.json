@@ -23,12 +23,6 @@
       255
     ],
     [
-      114,
-      96,
-      72,
-      255
-    ],
-    [
       232,
       73,
       239,
@@ -86,12 +80,6 @@
       26,
       37,
       164,
-      255
-    ],
-    [
-      146,
-      128,
-      104,
       255
     ],
     [
@@ -206,8 +194,8 @@
   ],
   "silhouette_count": 300,
   "preserved_detail_count": 48,
-  "line_continuity_score": 0.6389473684210526,
-  "shape_score": 0.8585235887646576,
+  "line_continuity_score": 0.6378947368421053,
+  "shape_score": 0.8582077992909733,
   "candidates": [
     {
       "grid": {
@@ -215,24 +203,24 @@
         "height": 32
       },
       "metrics": {
-        "surface_uniformity": 0.9936708860759493,
-        "edge_continuity": 0.9734471808140512,
+        "surface_uniformity": 1.0,
+        "edge_continuity": 0.9645962410854017,
         "isolated_pixels": 0,
-        "source_error": 0.00024438165898988187,
+        "source_error": 0.00023236859452868314,
         "grid_alignment": 0.941966196006923,
         "silhouette_count": 300,
         "preserved_detail_count": 48,
         "silhouette_retention": 1.0,
-        "line_continuity_retention": 0.6389473684210526,
+        "line_continuity_retention": 0.6378947368421053,
         "line_width_retention": 1.0,
         "small_detail_retention": 1.0,
         "corner_edge_consistency": 0.7789291882556131,
-        "shape_score": 0.8585235887646576,
-        "score": 2.854939998752325
+        "shape_score": 0.8582077992909733,
+        "score": 2.8556506539369337
       }
     }
   ],
-  "processing_ms": 2.4715000000000003,
+  "processing_ms": 2.5325,
   "options": {
     "output_mode": "preserve",
     "grid_width": 32,

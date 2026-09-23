@@ -165,3 +165,28 @@ pub fn interrupted_stroke() -> RgbaImage {
     }
     image
 }
+
+pub fn boundary_midpoint() -> RgbaImage {
+    RgbaImage::from_fn(96, 96, |x, y| {
+        if x >= 60 {
+            return Rgba([
+                ((x / 6 * 17 + y / 6 * 23) % 256) as u8,
+                ((x / 6 * 37 + y / 6 * 29) % 256) as u8,
+                ((x / 6 * 47 + y / 6 * 31) % 256) as u8,
+                255,
+            ]);
+        }
+        let value = if x < 31 {
+            32
+        } else {
+            144 + if y >= 48 { 32 } else { 0 } + [-16, 0, 16][x as usize % 3]
+        };
+        let noise = (((x * 73471) ^ (y * 91283)) % 9) as i16 - 4;
+        Rgba([
+            (value + 18 + noise) as u8,
+            (value + noise) as u8,
+            (value - 24 + noise) as u8,
+            255,
+        ])
+    })
+}
