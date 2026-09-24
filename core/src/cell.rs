@@ -775,7 +775,13 @@ fn straight_spill(
     false
 }
 
-pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
+pub fn decide(
+    cells: &[Cell],
+    q: &Quantized,
+    g: Grid,
+    o: &Options,
+    size: (usize, usize),
+) -> Vec<u8> {
     let shades = line_shades(q);
     let luma: Vec<_> = q
         .colors
@@ -793,7 +799,9 @@ pub fn decide(cells: &[Cell], q: &Quantized, g: Grid, o: &Options) -> Vec<u8> {
         let mut best = c.dominant;
         let mut best_score = f32::NEG_INFINITY;
         let effective_smoothing = smooth * smoothing_factor(c);
-        let tone = boundary_tone(c, q, &luma).or_else(|| coherent_tone(i, cells, q, g));
+        let tone = boundary_tone(c, q, &luma)
+            .or_else(|| coherent_tone(i, cells, q, g))
+            .or_else(|| diagonal_tone(i, c, q, g, size, &luma));
         let structure_weight = if tone.is_some() {
             BUILDING.tone_structure_weight
         } else {
@@ -1037,6 +1045,154 @@ fn coherent_tone(i: usize, cells: &[Cell], q: &Quantized, g: Grid) -> Option<f32
         }
         if count == 5 && ambiguous >= 3 {
             return Some(total / 5.0);
+        }
+    }
+    None
+}
+
+// Compare translated source profiles, including shallow diagonals. Cell-level
+// directions alone alias a 2:1 staircase into alternating horizontal/diagonal
+// fragments and over-reward its minor shades as separate lines.
+fn diagonal_tone(
+    i: usize,
+    c: &Cell,
+    q: &Quantized,
+    g: Grid,
+    (w, h): (usize, usize),
+    luma: &[f32],
+) -> Option<f32> {
+    if c.boundary_colors != 0 || c.details != 0 {
+        return None;
+    }
+    let (gx, gy) = (i % g.width as usize, i / g.width as usize);
+    let (x0, x1) = (gx * w / g.width as usize, (gx + 1) * w / g.width as usize);
+    let (y0, y1) = (gy * h / g.height as usize, (gy + 1) * h / g.height as usize);
+    if x1 - x0 < 3 || y1 - y0 < 3 {
+        return None;
+    }
+    let mask = (0..q.colors.len())
+        .filter(|&k| c.coverage[k] >= 0.1)
+        .fold(0u32, |mask, k| mask | (1 << k));
+    if mask.count_ones() < 2
+        || coverage(c, mask) < 0.88
+        || (0..q.colors.len()).any(|k| c.coverage[k] > 0.0 && q.colors[k][3] == 0)
+        || labels(mask).any(|a| {
+            labels(mask).any(|b| {
+                q.distances[a][b] > 0.06
+                    || [0, 2].into_iter().any(|channel| {
+                        let chroma = |k: usize| q.colors[k][channel] as i16 - q.colors[k][1] as i16;
+                        (chroma(a) - chroma(b)).abs() > 40
+                    })
+            })
+        })
+    {
+        return None;
+    }
+    let (mut low, mut high) = (f32::INFINITY, f32::NEG_INFINITY);
+    let mut errors = [f32::INFINITY; 2];
+    for k in labels(mask) {
+        low = low.min(luma[k]);
+        high = high.max(luma[k]);
+        let error = (luma[k] - c.source_luma).abs();
+        if error < errors[0] {
+            errors = [error, errors[0]];
+        } else {
+            errors[1] = errors[1].min(error);
+        }
+    }
+    // Small palette variations in a flat face are not diagonal structure.
+    // Keep them eligible for the existing region merge and noise removal.
+    if high - low < 20.0 {
+        return None;
+    }
+    let xs = [x0, (x0 + x1 - 1) / 2, x1 - 1];
+    let ys = [y0, (y0 + y1 - 1) / 2, y1 - 1];
+    let profile_matches = |dx: i32, dy: i32| {
+        let mut error = 0;
+        let mut brightness = 0i32;
+        for y in ys {
+            for x in xs {
+                let (xx, yy) = (x as i32 + dx, y as i32 + dy);
+                if xx < 0 || yy < 0 || xx >= w as i32 || yy >= h as i32 {
+                    return false;
+                }
+                let (a, b) = (y * w + x, yy as usize * w + xx as usize);
+                let difference = q.source_luma[a].abs_diff(q.source_luma[b]) as u32;
+                if q.colors[q.labels[b] as usize][3] == 0
+                    || q.distances[q.labels[a] as usize][q.labels[b] as usize] > 0.06
+                {
+                    return false;
+                }
+                error += difference;
+                brightness += q.source_luma[a] as i32 - q.source_luma[b] as i32;
+            }
+        }
+        error <= 9 * 18 && brightness.abs() <= 9 * 6
+    };
+    for swap in [false, true] {
+        let major = 2 * if swap { y1 - y0 } else { x1 - x0 } as i32;
+        let minor = if swap { x1 - x0 } else { y1 - y0 } as i32;
+        for step in [(minor + 1) / 2, minor, minor * 3 / 2, minor * 2] {
+            for sign in [-1, 1] {
+                let (dx, dy) = if swap {
+                    (step * sign, major)
+                } else {
+                    (major, step * sign)
+                };
+                // Visit every intervening cell-length, allowing only a one
+                // source-pixel phase adjustment perpendicular to the scan.
+                let mut support = 0;
+                for side in [-1, 1] {
+                    for distance in 1..=4 {
+                        if !(-1..=1).any(|phase| {
+                            profile_matches(
+                                dx * distance * side / 2 + if swap { phase } else { 0 },
+                                dy * distance * side / 2 + if swap { 0 } else { phase },
+                            )
+                        }) {
+                            break;
+                        }
+                        support += 1;
+                    }
+                }
+                if support >= 4 {
+                    // Do not reinterpret a narrow ridge as a flat face: both
+                    // sides of a real thin line can have the same background.
+                    let side_luma = |sign: i32| {
+                        let x = xs[1] as i32 - dy * sign / 2;
+                        let y = ys[1] as i32 + dx * sign / 2;
+                        if x < 0 || y < 0 || x >= w as i32 || y >= h as i32 {
+                            return None;
+                        }
+                        let index = y as usize * w + x as usize;
+                        (q.colors[q.labels[index] as usize][3] != 0)
+                            .then_some(q.source_luma[index] as f32)
+                    };
+                    let (Some(a), Some(b)) = (side_luma(-1), side_luma(1)) else {
+                        continue;
+                    };
+                    if (a - b).abs() < 12.0
+                        && ((a.min(b) - c.source_luma > 6.0 && a.min(b) - low >= 24.0)
+                            || (c.source_luma - a.max(b) > 6.0 && high - a.max(b) >= 24.0))
+                    {
+                        // A supported narrow ridge needs its ink, not the
+                        // average of ink and background, even at an endpoint.
+                        return labels(mask).map(|k| luma[k]).reduce(|x, y| {
+                            if a.min(b) > c.source_luma {
+                                x.min(y)
+                            } else {
+                                x.max(y)
+                            }
+                        });
+                    }
+                    // At a palette midpoint, leave shade selection to the
+                    // existing score instead of amplifying small source noise.
+                    if errors[1] - errors[0] < 4.0 {
+                        continue;
+                    }
+                    return Some(c.source_luma);
+                }
+            }
         }
     }
     None

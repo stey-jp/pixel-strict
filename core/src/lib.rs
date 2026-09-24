@@ -232,7 +232,7 @@ pub fn convert(bytes: &[u8], options: &Options) -> Result<Conversion, String> {
     let mut best: Option<(f64, Grid, Vec<u8>, [usize; 5])> = None;
     for g in grids.drain(..) {
         let cells = cell::analyze(&q, w as usize, h as usize, g);
-        let out = cell::decide(&cells, &q, g, options);
+        let out = cell::decide(&cells, &q, g, options, (w as usize, h as usize));
         let metrics = cell::evaluate(
             &cells,
             &out,

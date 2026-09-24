@@ -2,7 +2,7 @@
 
 AI生成の疑似ピクセルアートを、整数グリッド・1セル1色のPNGへ再構成するローカルアプリです。Flutter UI / Rust core / C ABI FFI。OpenAI API・画像生成・OpenCVは使用しません。
 
-現在のWindows版は **v0.1.8+9**。右上の表示とexeの製品バージョンは`app/pubspec.yaml`の同じ値を使います。修正を配布する際はこのversionを更新して再ビルドしてください。Releaseは`flutter build windows --release`で生成する`app/build/windows/x64/runner/Release/`です。初回MVPの`output/PixelStrict-windows-x64.zip`、`output/PixelStrict-android-arm64-debug.apk`は旧版です。[検証結果](VALIDATION.md)と[比較画像](samples/comparison.png)も参照してください。Windows配布時はexe単体ではなくDLL・dataを含むReleaseフォルダー全体が必要です。
+現在のWindows版は **v0.1.9+10**。右上の表示とexeの製品バージョンは`app/pubspec.yaml`の同じ値を使います。修正を配布する際はこのversionを更新して再ビルドしてください。Releaseは`flutter build windows --release`で生成する`app/build/windows/x64/runner/Release/`です。初回MVPの`output/PixelStrict-windows-x64.zip`、`output/PixelStrict-android-arm64-debug.apk`は旧版です。[検証結果](VALIDATION.md)と[比較画像](samples/comparison.png)も参照してください。Windows配布時はexe単体ではなくDLL・dataを含むReleaseフォルダー全体が必要です。
 
 ## 構成
 
@@ -88,6 +88,8 @@ Autoでは線の中央色・連続性に加え、線幅も元画像と比較し�
 直線の内側で3色以上の近い明暗が競合する場合は、元の明るさとの誤差も色選択に加えます。縦横の同方向に5セル連続し、元画像の平均明度差が6/255以内、そのうち3セル以上で色が競合する場合だけ適用。通常は前後2セルずつを参照し、端点や明暗の切り替わりでは、同じ陰影が続く側を最大4セルまで調べます。切れ目や明度・方向の変化で探索を止め、離れた領域を飛び越えて支持を集めません。細い陰影へのLINE加点を弱め、元セルにある色から選びます。保護された小形状、透明画素を含むセルは補正対象外です。セル全体の明度平均は1セル4 bytes（最大4 MiB）。判定は元のセル情報を参照し、描画済みの隣セルから色を伝播させません。
 
 位置を固定した境界セルでは、採用する側の面だけの元明度を参照します。候補色の制限を保ったまま、同じ面の2色以上から選択。候補同士のOKLab二乗距離が0.004以内、明度幅が10/255以上、最も近い色と次の色の明度誤差に4/255以上の差がある場合に限ります。中間色に近い曖昧な場合や小さな色差では従来の判定を維持し、面のノイズによる色の切り替わりを抑えます。面の明度の保持に1セル4 bytes（最大4 MiB）を追加します。境界の位置判定・パレット・整数矩形描画は変更しません。
+
+斜めの帯や陰影には、元画像の明度を整数座標で照合する補助を追加しています。浅い斜線・急な斜線・両傾斜を調べ、途中を飛ばさず4区間以上の連続性を確認。階段の位相差は±1pxまで許容します。通常の帯は元セルの平均明度を参照し、両側が同じ背景の細線は線色を保持。明度幅20/255未満の微小な面ノイズや、中間色付近の曖昧な面には適用しません。境界の位置制限・小形状・透明部分の保護を優先し、パレットと整数単色矩形描画は維持します。追加バッファ・依存なし。方向照合による速度への影響はVALIDATION.mdに記載しています。
 
 既存Pixel Art Fixer / Pixel Snapperのコードはコピーしていません。正規グリッドへの再構成とSurface Strict / Edge Strict / Shape Strictを独自実装しています。Autoと外形判定は軽量な近似で、物体の意味理解や元グリッドの厳密復元ではありません。量子化や任意のMedianで既に消えた色・細部は後段では復元できません。1セル内に複数の形がある場合は1セル1色の制約が優先されます。非整数拡大、オフセット、密な植物、意図的な色テクスチャはManual GridやShape強・Median Offでも比較してください。JPEGのEXIF回転・ICC色管理・アニメーションの再生はMVP対象外です。
 

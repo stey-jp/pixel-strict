@@ -190,3 +190,31 @@ pub fn boundary_midpoint() -> RgbaImage {
         ])
     })
 }
+
+pub fn diagonal_shades() -> RgbaImage {
+    RgbaImage::from_fn(144, 144, |x, y| {
+        if x >= 114 {
+            return Rgba([
+                ((x / 6 * 17 + y / 6 * 23) % 256) as u8,
+                ((x / 6 * 37 + y / 6 * 29) % 256) as u8,
+                ((x / 6 * 47 + y / 6 * 31) % 256) as u8,
+                255,
+            ]);
+        }
+        let normal = 2 * y as i32 - x as i32;
+        let value = if (30..78).contains(&normal) {
+            80 + if x >= 72 { 32 } else { 0 } + [-16, 0, 16][normal.rem_euclid(3) as usize]
+        } else if (27..81).contains(&normal) {
+            30
+        } else {
+            208
+        };
+        let noise = (((x * 73471) ^ (y * 91283)) % 9) as i32 - 4;
+        Rgba([
+            (value + 18 + noise) as u8,
+            (value + noise) as u8,
+            (value - 24 + noise) as u8,
+            255,
+        ])
+    })
+}

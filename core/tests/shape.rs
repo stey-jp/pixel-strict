@@ -19,6 +19,195 @@ fn decoded(bytes: &[u8]) -> RgbaImage {
 }
 
 #[test]
+fn diagonal_band_tones_follow_source_brightness_and_keep_lighting_changes() {
+    let original = shapes::diagonal_shades();
+    for rotation in 0..4 {
+        let source = match rotation {
+            0 => original.clone(),
+            1 => image::imageops::rotate90(&original),
+            2 => image::imageops::flip_vertical(&original),
+            _ => image::imageops::rotate90(&image::imageops::flip_vertical(&original)),
+        };
+        let bytes = encode(&source);
+        for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+            let result = convert(
+                &bytes,
+                &Options {
+                    output_mode,
+                    ..settings(48)
+                },
+            )
+            .unwrap();
+            let output = decoded(&result.png);
+            let out = match rotation {
+                0 => output.clone(),
+                1 => image::imageops::rotate270(&output),
+                2 => image::imageops::flip_vertical(&output),
+                _ => image::imageops::flip_vertical(&image::imageops::rotate270(&output)),
+            };
+            let pitch = if output_mode == OutputMode::Preserve {
+                3
+            } else {
+                1
+            };
+            let mut errors = [0.0f32; 2];
+            let mut counts = [0; 2];
+            for gx in 5..34 {
+                // Keep the actual lighting step and source-profile support in
+                // separate intervals; never average the two sides together.
+                if (21..27).contains(&gx) {
+                    continue;
+                }
+                for gy in 0..48 {
+                    let normal = 6 * gy - 3 * gx;
+                    if !(39..66).contains(&normal) {
+                        continue;
+                    }
+                    let mut source = 0.0;
+                    for y in gy * 3..gy * 3 + 3 {
+                        for x in gx * 3..gx * 3 + 3 {
+                            let p = original.get_pixel(x as u32, y as u32);
+                            source +=
+                                (77.0 * p[0] as f32 + 150.0 * p[1] as f32 + 29.0 * p[2] as f32)
+                                    / (256.0 * 9.0);
+                        }
+                    }
+                    let p = out.get_pixel(gx as u32 * pitch, gy as u32 * pitch);
+                    let actual =
+                        (77.0 * p[0] as f32 + 150.0 * p[1] as f32 + 29.0 * p[2] as f32) / 256.0;
+                    let side = usize::from(gx >= 24);
+                    errors[side] += (actual - source).abs();
+                    counts[side] += 1;
+                }
+            }
+            for side in 0..2 {
+                assert!(
+                    errors[side] / (counts[side] as f32) < 5.0,
+                    "rotation {rotation}, {output_mode:?}, side {side}: {}",
+                    errors[side] / counts[side] as f32
+                );
+            }
+            if pitch == 3 {
+                for (x, y, p) in output.enumerate_pixels() {
+                    assert_eq!(p, output.get_pixel(x / 3 * 3, y / 3 * 3));
+                }
+            }
+            assert_eq!(
+                result.png,
+                convert(&bytes, &result.report.options).unwrap().png
+            );
+        }
+    }
+}
+
+#[test]
+fn diagonal_tone_guide_keeps_thin_lines_steps_and_gaps() {
+    for (rise, run) in [(1, 2), (2, 5), (1, 1)] {
+        let reference = RgbaImage::from_fn(144, 144, |x, y| {
+            let line_y = 9 + x * rise / run + if x >= 93 { 6 } else { 0 };
+            let ink = (12..120).contains(&x)
+                && !(66..75).contains(&x)
+                && (line_y..line_y + 2).contains(&y);
+            Rgba(if ink {
+                [124, 124, 124, 255]
+            } else {
+                [156, 156, 156, 255]
+            })
+        });
+        for rotated in [false, true] {
+            let input = if rotated {
+                image::imageops::rotate90(&reference)
+            } else {
+                reference.clone()
+            };
+            for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+                let result = convert(
+                    &encode(&input),
+                    &Options {
+                        output_mode,
+                        ..settings(48)
+                    },
+                )
+                .unwrap();
+                let output = decoded(&result.png);
+                let output = if rotated {
+                    image::imageops::rotate270(&output)
+                } else {
+                    output
+                };
+                let pitch = if output_mode == OutputMode::Preserve {
+                    3
+                } else {
+                    1
+                };
+                for gx in 4..40 {
+                    if (22..25).contains(&gx) {
+                        continue;
+                    }
+                    let y = (9 + (gx * 3 + 1) * rise / run + if gx >= 31 { 6 } else { 0 }) / 3;
+                    assert!(
+                        (y.saturating_sub(1)..=y + 1)
+                            .any(|gy| output.get_pixel(gx * pitch, gy * pitch)[0] < 140),
+                        "lost {rise}:{run} line, column {gx}, {output_mode:?}"
+                    );
+                }
+                for gx in 22..25 {
+                    for gy in 0..48 {
+                        assert!(
+                            output.get_pixel(gx * pitch, gy * pitch)[0] > 140,
+                            "filled gap at ({gx},{gy})"
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn diagonal_tone_guide_keeps_transparent_breaks_and_colored_details() {
+    let mut input = shapes::diagonal_shades();
+    for y in 0..144 {
+        for x in 48..54 {
+            input.put_pixel(x, y, Rgba([0, 0, 0, 0]));
+        }
+    }
+    for y in 39..45 {
+        for x in 60..63 {
+            input.put_pixel(x, y, Rgba([80, 140, 60, 255]));
+        }
+    }
+    for output_mode in [OutputMode::Preserve, OutputMode::Logical] {
+        let result = convert(
+            &encode(&input),
+            &Options {
+                output_mode,
+                ..settings(48)
+            },
+        )
+        .unwrap();
+        let output = decoded(&result.png);
+        let pitch = if output_mode == OutputMode::Preserve {
+            3
+        } else {
+            1
+        };
+        for y in 0..48 {
+            for x in 16..18 {
+                assert_eq!(output.get_pixel(x * pitch, y * pitch).0, [0, 0, 0, 0]);
+            }
+        }
+        for y in 13..15 {
+            let p = output.get_pixel(20 * pitch, y * pitch);
+            assert!(
+                p[1] > p[0] + 30 && p[1] > p[2] + 30,
+                "lost colored detail: {p:?}"
+            );
+        }
+    }
+}
+
+#[test]
 fn transparent_building_silhouette_and_protrusions_survive() {
     let input = RgbaImage::from_fn(32, 32, |x, y| {
         if ((7..25).contains(&x) && (12..28).contains(&y))

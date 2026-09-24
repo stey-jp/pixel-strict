@@ -21,6 +21,7 @@ fn main() {
         ("shaded-stroke", shapes::shaded_stroke(), 32),
         ("interrupted-stroke", shapes::interrupted_stroke(), 32),
         ("boundary-midpoint", shapes::boundary_midpoint(), 32),
+        ("diagonal-shades", shapes::diagonal_shades(), 48),
     ] {
         let input = dir.join(format!("{name}-input.png"));
         source.save(&input).unwrap();

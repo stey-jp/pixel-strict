@@ -16,6 +16,7 @@ cargo run --release --locked --manifest-path core/Cargo.toml --example shape_sam
 - `shaded-stroke`: 近い3色が競合する縦線と、途中の明暗変化。96×96・Manual Grid 32（P=3）。
 - `interrupted-stroke`: 上記の線に横棒、2セルの色付き小形状、6pxの切れ目を追加。96×96・Manual Grid 32（P=3）。
 - `boundary-midpoint`: 暗い面と、近い明暗を含む明るい面の境界。候補色の中間に近い明度にノイズを加え、途中の陰影も変化させる。96×96・Manual Grid 32（P=3）。
+- `diagonal-shades`: 1:2の斜めの帯、細い輪郭、競合する陰影、途中の明暗変化。144×144・Manual Grid 48（P=3）、Auto Grid 72（P=2）。
 
 `*-input.png`が入力、`*-manual.png`はPreserve・Colors 32・Smoothing 3・Edge 2・Shape 2、`*-auto.png`は同設定でGrid Autoです。対応JSONに候補評価を出力します。最初の3例は48×48・Manual Grid 48（P=1）。`vertical-*`は96×96・Manual Grid 24（P=4）。拡大時にも補間しないで比較してください。
 
@@ -42,5 +43,7 @@ cargo run --release --locked --manifest-path core/Cargo.toml --example shape_sam
 `interrupted-stroke`では、横棒の近くまで線の内側の明度を整えつつ、横棒自体、2セルの色付き小形状、6pxの切れ目を保持します。上側の48セル中、v0.1.7+8で明度がずれた29セルがv0.1.8+9では0セルに減少。2セルごとに陰影が切り替わる線と透明な切れ目を加えた別テストでも、短い領域を飛び越えて補正しないことを検証しています。
 
 `boundary-midpoint`では、明度が二つの候補の中間にある場所で、微小ノイズによって境界色が交互に変わらないことを検証します。縦横・両出力モードで安定した明度と元の面の位置を保ち、全セル単色・決定論性も確認。曖昧な色は従来の判断を残すため、陰影の切り替わりの1行には従来の明度差が残ります。
+
+`diagonal-shades`は旧版で帯の明暗誤差が約16.8/255あった区間を約0.7〜1.1/255へ改善。反転・回転・両出力モードで検証します。別テストで1:2 / 2:5 / 1:1の細線と段差・切れ目、透明部分、2セルの色付き小形状を保つことも確認しています。
 
 fixtureでの結果は実画像全般に対する品質保証ではありません。Medianと量子化による前段の情報損失、1セル1色より細かい形の再現、密な植物や非整数グリッドは引き続き制限があります。

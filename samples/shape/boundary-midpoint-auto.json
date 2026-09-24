@@ -231,20 +231,20 @@
         "height": 16
       },
       "metrics": {
-        "surface_uniformity": 0.8560460652591171,
+        "surface_uniformity": 0.7907801418439716,
         "edge_continuity": 0.7242095627589036,
         "isolated_pixels": 14,
-        "source_error": 0.0032866753869691583,
+        "source_error": 0.0031119376314005733,
         "grid_alignment": 0.7400913703851609,
         "silhouette_count": 156,
         "preserved_detail_count": 75,
-        "silhouette_retention": 0.8803827751196173,
-        "line_continuity_retention": 0.39655172413793105,
+        "silhouette_retention": 0.9090909090909091,
+        "line_continuity_retention": 0.3390804597701149,
         "line_width_retention": 1.0,
         "small_detail_retention": 1.0,
-        "corner_edge_consistency": 0.5269612606947541,
-        "shape_score": 0.7061436776374584,
-        "score": 1.8007196804331687
+        "corner_edge_consistency": 0.5201471064616323,
+        "shape_score": 0.6979280220820975,
+        "score": 1.6118953478072235
       }
     },
     {
@@ -319,20 +319,20 @@
         "height": 12
       },
       "metrics": {
-        "surface_uniformity": 0.868,
+        "surface_uniformity": 0.8615916955017301,
         "edge_continuity": 0.6655355429906953,
-        "isolated_pixels": 8,
-        "source_error": 0.020156086721625697,
+        "isolated_pixels": 9,
+        "source_error": 0.019910537572690776,
         "grid_alignment": 0.06323657184823735,
         "silhouette_count": 92,
         "preserved_detail_count": 58,
         "silhouette_retention": 0.1722488038277512,
-        "line_continuity_retention": 0.29914529914529914,
+        "line_continuity_retention": 0.28205128205128205,
         "line_width_retention": 1.0,
         "small_detail_retention": 0.8923076923076924,
-        "corner_edge_consistency": 0.04755332760031042,
-        "shape_score": 0.3356252086848877,
-        "score": -0.05154868865619078
+        "corner_edge_consistency": 0.04057302263145751,
+        "shape_score": 0.32944995781135467,
+        "score": -0.06350268074407678
       }
     },
     {
@@ -402,7 +402,7 @@
       }
     }
   ],
-  "processing_ms": 13.753599999999999,
+  "processing_ms": 13.9976,
   "options": {
     "output_mode": "preserve",
     "grid_width": null,
