@@ -1,14 +1,22 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:pixelstrict/main.dart';
 import 'package:pixelstrict/converter.dart';
+
+Future<String> currentVersion() async {
+  final manifest = await rootBundle.loadString('pubspec.yaml');
+  return RegExp(
+    r'^version:\s*(\S+)',
+    multiLine: true,
+  ).firstMatch(manifest)!.group(1)!;
+}
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
@@ -78,7 +86,7 @@ void main() {
       expect(info[1], startsWith('Grid '));
       expect(info[2], matches(r'^\d+ ms  ·  \d+候補を評価$'));
       expect(find.textContaining(' ms'), findsOneWidget);
-      expect(find.text('v0.1.9+10'), findsOneWidget);
+      expect(find.text('v${await currentVersion()}'), findsOneWidget);
       expect(
         tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,
         isNotNull,
@@ -258,13 +266,16 @@ void main() {
       for (var i = 0; i < 100; i++) {
         await tester.pump(const Duration(milliseconds: 100));
         if (find
-            .textContaining('Preserve output requires')
+            .textContaining('このGrid幅では元のサイズと均等な正方形セルを両立できません。')
             .evaluate()
             .isNotEmpty) {
           break;
         }
       }
-      expect(find.textContaining('Preserve output requires'), findsOneWidget);
+      expect(
+        find.textContaining('このGrid幅では元のサイズと均等な正方形セルを両立できません。'),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('resultInfo')), findsNothing);
       expect(
         tester.widget<OutlinedButton>(find.byKey(const Key('save'))).onPressed,
@@ -273,6 +284,19 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('Filesystem failures show Japanese messages', (tester) async {
+    const message = 'ファイルにアクセスできません。ファイルの場所やアクセス権を確認してください。';
+    await tester.pumpWidget(
+      const PixelStrictApp(initialPath: 'missing-pixelstrict-review-image.png'),
+    );
+    for (var i = 0; i < 100; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.text(message).evaluate().isNotEmpty) break;
+    }
+    expect(find.text(message), findsOneWidget);
+    expect(find.textContaining('FileSystemException'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   const previewPath = String.fromEnvironment('PREVIEW_PATH');
   if (previewPath.isNotEmpty) {
     testWidgets('Loaded image renders with fixed actions', (tester) async {
@@ -301,7 +325,7 @@ void main() {
       }
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('resultInfo')), findsOneWidget);
-      expect(find.text('v0.1.9+10'), findsOneWidget);
+      expect(find.text('v${await currentVersion()}'), findsOneWidget);
       final convert = tester.getRect(find.byKey(const Key('convert')));
       final save = tester.getRect(find.byKey(const Key('save')));
       await tester.ensureVisible(find.byKey(const Key('shapeProtection')));
@@ -311,6 +335,8 @@ void main() {
       expect(tester.takeException(), isNull);
       const screenshot = String.fromEnvironment('SCREENSHOT_PATH');
       if (screenshot.isNotEmpty) {
+        await tester.ensureVisible(find.byKey(const Key('outputMode')));
+        await tester.pumpAndSettle();
         final image =
             await (boundary.currentContext!.findRenderObject()
                     as RenderRepaintBoundary)

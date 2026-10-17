@@ -118,7 +118,11 @@ class _WorkbenchState extends State<Workbench> {
     } catch (error) {
       if (mounted) {
         setState(
-          () => _error = error.toString().replaceFirst('FormatException: ', ''),
+          () => _error = switch (error) {
+            ImageConversionException() => error.message,
+            FileSystemException() => 'ファイルにアクセスできません。ファイルの場所やアクセス権を確認してください。',
+            _ => '処理に失敗しました。画像と設定を確認して、もう一度お試しください。',
+          },
         );
       }
     } finally {
@@ -128,15 +132,21 @@ class _WorkbenchState extends State<Workbench> {
 
   Future<void> _accept(Uint8List bytes, String name) async {
     if (bytes.isEmpty || bytes.length > maxInputBytes) {
-      throw const FormatException('64 MiB以下の画像を選択してください。');
+      throw const ImageConversionException('64 MiB以下の画像を選択してください。');
     }
     final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
     ui.ImageDescriptor? descriptor;
     try {
-      descriptor = await ui.ImageDescriptor.encoded(buffer);
+      try {
+        descriptor = await ui.ImageDescriptor.encoded(buffer);
+      } catch (_) {
+        throw const ImageConversionException(
+          '画像を読み込めません。ファイルが壊れていないか確認してください。',
+        );
+      }
       final width = descriptor.width, height = descriptor.height;
       if (width > 8192 || height > 8192 || width * height > 16777216) {
-        throw const FormatException('画像上限は各辺8192px・合計16メガピクセルです。');
+        throw const ImageConversionException('画像上限は各辺8192px・合計16メガピクセルです。');
       }
       if (!mounted) return;
       setState(() {
@@ -154,9 +164,12 @@ class _WorkbenchState extends State<Workbench> {
   }
 
   Future<void> _loadPath(String path) => _guard('画像を読み込み中', () async {
+    if (!RegExp(r'\.(png|jpe?g|webp)$', caseSensitive: false).hasMatch(path)) {
+      throw const ImageConversionException('PNG・JPEG・WebP画像を選んでください。');
+    }
     final file = File(path);
     if (await file.length() > maxInputBytes) {
-      throw const FormatException('64 MiB以下の画像を選択してください。');
+      throw const ImageConversionException('64 MiB以下の画像を選択してください。');
     }
     await _accept(await file.readAsBytes(), path.split(RegExp(r'[/\\]')).last);
   });
@@ -169,7 +182,7 @@ class _WorkbenchState extends State<Workbench> {
     if (file == null) return;
     final length = await file.length();
     if (length != null && length > maxInputBytes) {
-      throw const FormatException('64 MiB以下の画像を選択してください。');
+      throw const ImageConversionException('64 MiB以下の画像を選択してください。');
     }
     await _accept(await file.readAsBytes(), file.name);
   });
@@ -177,7 +190,7 @@ class _WorkbenchState extends State<Workbench> {
   Future<void> _convert() => _guard('画像を変換中', () async {
     final width = _manual ? int.tryParse(_gridController.text) : null;
     if (_manual && (width == null || width < 1 || width > _width)) {
-      throw FormatException('Grid幅は1〜$_widthの整数で指定してください。');
+      throw ImageConversionException('Grid幅は1〜$_widthの整数で指定してください。');
     }
     final result = await convertImage(
       _source!,
@@ -330,6 +343,16 @@ class _WorkbenchState extends State<Workbench> {
         ],
         onChanged: _busy ? null : (v) => _change(() => _outputMode = v!),
       ),
+      if (_outputMode == OutputMode.preserve)
+        const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text(
+            '元のサイズを保つため、セル幅は画像の両辺を割り切る整数に限られます。'
+            '粒度が合わない場合はLogical pixelsを選んでください。',
+            key: Key('outputHint'),
+            style: TextStyle(color: _muted, fontSize: 12),
+          ),
+        ),
       const SizedBox(height: 24),
       _label('Grid', '正規グリッドの解像度'),
       SegmentedButton<bool>(

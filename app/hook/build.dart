@@ -25,7 +25,14 @@ void main(List<String> args) async {
         _ => throw UnsupportedError('Unsupported Android architecture'),
       };
       final suffix = Platform.isWindows ? '.cmd' : '';
-      final linker = code.cCompiler!.compiler
+      final compiler = code.cCompiler;
+      if (compiler == null) {
+        throw StateError(
+          'Android NDK compiler is not configured. Install the Android NDK '
+          'and check the Android toolchain with flutter doctor.',
+        );
+      }
+      final linker = compiler.compiler
           .resolve('$clangTarget${code.android.targetNdkApi}-clang$suffix')
           .toFilePath();
       if (!File(linker).existsSync()) {

@@ -1,9 +1,32 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pixelstrict/main.dart';
 import 'package:pixelstrict/converter.dart';
 
 void main() {
+  final manifest = File('pubspec.yaml').readAsStringSync();
+  final version = RegExp(
+    r'^version:\s*(\S+)',
+    multiLine: true,
+  ).firstMatch(manifest)!.group(1)!;
+  // Asset futures must not retain the previous widget test's fake-async zone.
+  setUp(rootBundle.clear);
+  testWidgets('Unsupported paths show Japanese messages', (tester) async {
+    for (final (path, message) in [
+      ('unsupported.txt', 'PNG・JPEG・WebP画像を選んでください。'),
+    ]) {
+      await tester.pumpWidget(PixelStrictApp(initialPath: path));
+      await tester.pumpAndSettle();
+      expect(find.text(message), findsOneWidget);
+      expect(find.textContaining('FileSystemException'), findsNothing);
+      expect(find.textContaining('Bad state:'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+  });
   testWidgets(
     'Empty workbench disables conversion and save at mobile and desktop sizes',
     (tester) async {
@@ -18,7 +41,7 @@ void main() {
         expect(find.text('PixelStrict'), findsOneWidget);
         expect(
           tester.widget<Text>(find.byKey(const Key('appVersion'))).data,
-          'v0.1.9+10',
+          'v$version',
         );
         for (final text in [
           '曖昧なピクセルを、使える素材へ。',
@@ -50,6 +73,7 @@ void main() {
               .initialValue,
           OutputMode.preserve,
         );
+        expect(find.byKey(const Key('outputHint')), findsOneWidget);
         await tester.ensureVisible(output);
         await tester.tap(output);
         await tester.pumpAndSettle();
@@ -61,6 +85,7 @@ void main() {
               .initialValue,
           OutputMode.logical,
         );
+        expect(find.byKey(const Key('outputHint')), findsNothing);
         expect(
           tester
               .widget<FilledButton>(find.byKey(const Key('convert')))

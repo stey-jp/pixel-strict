@@ -15,9 +15,12 @@ pub enum Class {
 }
 
 pub struct Cell {
-    pub coverage: [f32; 32],
-    line: [f32; 32],
-    direction: [u8; 32],
+    // Single-color cells (including every 1px cell) need no palette allocation.
+    // Mixed cells store only present labels, in ascending palette order.
+    samples: Option<Box<[ColorSample]>>,
+    present: u32,
+    solid_line: f32,
+    solid_direction: u8,
     // Colors touching left/right/top/bottom source-cell boundaries.
     borders: [u32; 4],
     // Allowed source colors on the majority side of a stable straight boundary.
@@ -30,6 +33,47 @@ pub struct Cell {
     silhouette: u32,
     lines: u32,
     details: u32,
+}
+
+#[derive(Clone, Copy, Default)]
+struct ColorSample {
+    coverage: f32,
+    line: f32,
+    direction: u8,
+}
+
+impl Cell {
+    fn sample(&self, k: usize) -> ColorSample {
+        let bit = 1u32 << k;
+        if self.present & bit == 0 {
+            return ColorSample::default();
+        }
+        match &self.samples {
+            Some(samples) => samples[(self.present & (bit - 1)).count_ones() as usize],
+            None => ColorSample {
+                coverage: 1.0,
+                line: self.solid_line,
+                direction: self.solid_direction,
+            },
+        }
+    }
+
+    fn coverage(&self, k: usize) -> f32 {
+        self.sample(k).coverage
+    }
+
+    fn line(&self, k: usize) -> f32 {
+        self.sample(k).line
+    }
+
+    fn direction(&self, k: usize) -> u8 {
+        self.sample(k).direction
+    }
+
+    fn coverages(&self) -> impl Iterator<Item = (usize, f32)> + '_ {
+        // Include absent labels to preserve the original floating-point sum order.
+        (0..32).map(|k| (k, self.coverage(k)))
+    }
 }
 
 // Building-oriented defaults. Future presets can replace this balance without
@@ -92,9 +136,13 @@ fn neighbors(i: usize, g: Grid) -> impl Iterator<Item = usize> + Clone {
     })
 }
 
-pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
+pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Result<Vec<Cell>, String> {
     let shades = line_shades(q);
-    let mut cells = Vec::with_capacity((g.width * g.height) as usize);
+    let memory_error = || "Not enough memory to analyze this image; choose a smaller grid width";
+    let mut cells = Vec::new();
+    cells
+        .try_reserve_exact((g.width * g.height) as usize)
+        .map_err(|_| memory_error())?;
     for gy in 0..g.height as usize {
         for gx in 0..g.width as usize {
             let x0 = gx * w / g.width as usize;
@@ -175,10 +223,30 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
             } else {
                 Class::Unknown
             };
+            let present = counts.iter().enumerate().fold(0u32, |mask, (k, &count)| {
+                mask | if count > 0 { 1 << k } else { 0 }
+            });
+            let samples = if present.count_ones() > 1 {
+                let mut samples = Vec::new();
+                samples
+                    .try_reserve_exact(present.count_ones() as usize)
+                    .map_err(|_| memory_error())?;
+                for k in labels(present) {
+                    samples.push(ColorSample {
+                        coverage: coverage[k],
+                        line: line[k],
+                        direction: direction[k],
+                    });
+                }
+                Some(samples.into_boxed_slice())
+            } else {
+                None
+            };
             cells.push(Cell {
-                coverage,
-                line,
-                direction,
+                samples,
+                present,
+                solid_line: line[dominant],
+                solid_direction: direction[dominant],
                 borders,
                 boundary_colors: 0,
                 boundary_luma: 0.0,
@@ -212,10 +280,8 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
     protect_details(&mut cells, q, g);
     for (i, cell) in cells.iter_mut().enumerate() {
         if cell
-            .coverage
-            .iter()
-            .enumerate()
-            .any(|(k, &v)| v >= 0.055 && q.distances[k][cell.dominant as usize] > STRAIGHT_CONTRAST)
+            .coverages()
+            .any(|(k, v)| v >= 0.055 && q.distances[k][cell.dominant as usize] > STRAIGHT_CONTRAST)
         {
             (cell.boundary_colors, cell.boundary_luma) =
                 straight_boundary(i, cell, q, w, h, g, false);
@@ -225,7 +291,7 @@ pub fn analyze(q: &Quantized, w: usize, h: usize, g: Grid) -> Vec<Cell> {
             }
         }
     }
-    cells
+    Ok(cells)
 }
 
 fn straight_boundary(
@@ -356,17 +422,15 @@ fn straight_boundary(
         );
         let mask: u32 = (0..q.colors.len())
             .filter(|&k| {
-                cell.coverage[k] >= 0.055
+                cell.coverage(k) >= 0.055
                     && q.distances[target][k] <= (palette_contrast * 0.25).min(0.004)
             })
             .fold(0, |mask, k| mask | (1 << k));
         // When the whole cell already belongs to this face, leave ordinary
         // surface merging enabled instead of locking its small color variations.
         let restricts = cell
-            .coverage
-            .iter()
-            .enumerate()
-            .any(|(k, &v)| v >= 0.055 && mask & (1 << k) == 0);
+            .coverages()
+            .any(|(k, v)| v >= 0.055 && mask & (1 << k) == 0);
         if mask != 0 && (!source || restricts) {
             if mask.count_ones() == 1 {
                 return (mask, 0.0);
@@ -428,11 +492,11 @@ fn protect_silhouettes(cells: &mut [Cell], q: &Quantized, g: Grid) {
         let alpha = q.colors[dominant][3];
         let mut mask = 0;
         for k in 0..q.colors.len() {
-            if cells[i].coverage[k] < 0.055 {
+            if cells[i].coverage(k) < 0.055 {
                 continue;
             }
             let mixed_alpha = (0..q.colors.len()).any(|other| {
-                cells[i].coverage[other] >= 0.055 && q.colors[other][3] != q.colors[k][3]
+                cells[i].coverage(other) >= 0.055 && q.colors[other][3] != q.colors[k][3]
             });
             let boundary = neighbors(i, g).any(|n| {
                 let other = cells[n].dominant as usize;
@@ -451,29 +515,29 @@ fn protect_lines(cells: &mut [Cell], q: &Quantized, g: Grid, shades: &[u32; 32])
     for i in 0..cells.len() {
         let mut mask = 0;
         for k in 0..q.colors.len() {
-            if cells[i].coverage[k] < 0.055 {
+            if cells[i].coverage(k) < 0.055 {
                 continue;
             }
             let subcell = thin_direction(&cells[i], k, q)
-                && cells[i].coverage[k] <= 0.5
+                && cells[i].coverage(k) <= 0.5
                 && q.distances[k][cells[i].dominant as usize] > 0.008
                 && directional_support(i, k, cells, g, q, shades)
-                    > if cells[i].line[k] > 0.75 {
+                    > if cells[i].line(k) > 0.75 {
                         0.12
                     } else {
-                        cells[i].line[k] * 0.12
+                        cells[i].line(k) * 0.12
                     };
-            let thin = cells[i].coverage[k] >= 0.5
+            let thin = cells[i].coverage(k) >= 0.5
                 && AXES.iter().any(|&(dx, dy)| {
                     let along = [-1, 1].into_iter().any(|s| {
-                        neighbor(i, dx * s, dy * s, g).is_some_and(|n| cells[n].coverage[k] >= 0.5)
+                        neighbor(i, dx * s, dy * s, g).is_some_and(|n| cells[n].coverage(k) >= 0.5)
                     });
                     // Contrast on both sides within two cells excludes broad faces.
                     along
                         && [-1, 1].into_iter().all(|s| {
                             (1..=2).any(|d| {
                                 neighbor(i, -dy * s * d, dx * s * d, g).is_some_and(|n| {
-                                    cells[n].coverage[k] < 0.18
+                                    cells[n].coverage(k) < 0.18
                                         && q.distances[k][cells[n].dominant as usize] > 0.0007
                                 })
                             })
@@ -493,7 +557,7 @@ fn protect_lines(cells: &mut [Cell], q: &Quantized, g: Grid, shades: &[u32; 32])
     let lines: Vec<_> = cells.iter().map(|c| c.lines).collect();
     for (i, cell) in cells.iter_mut().enumerate() {
         for k in 0..q.colors.len() {
-            if cell.coverage[k] < 0.18 {
+            if cell.coverage(k) < 0.18 {
                 continue;
             }
             let axes = AXES
@@ -550,7 +614,7 @@ fn protect_details(cells: &mut [Cell], q: &Quantized, g: Grid) {
     let mut visited = vec![0u32; cells.len()];
     for k in 0..q.colors.len() {
         let bit = 1 << k;
-        let present = |c: &Cell| c.coverage[k] >= 0.18;
+        let present = |c: &Cell| c.coverage(k) >= 0.18;
         for start in 0..cells.len() {
             if visited[start] & bit != 0 || !present(&cells[start]) {
                 continue;
@@ -574,7 +638,7 @@ fn protect_details(cells: &mut [Cell], q: &Quantized, g: Grid) {
             }
             let contrast = region.iter().any(|&i| {
                 neighbors(i, g).any(|n| {
-                    cells[n].coverage[k] < 0.18
+                    cells[n].coverage(k) < 0.18
                         && q.distances[k][cells[n].dominant as usize] > 0.0003
                 })
             });
@@ -613,18 +677,18 @@ fn line_shades(q: &Quantized) -> [u32; 32] {
 }
 
 fn coverage(c: &Cell, mask: u32) -> f32 {
-    labels(mask).map(|k| c.coverage[k]).sum()
+    labels(mask).map(|k| c.coverage(k)).sum()
 }
 
 fn supporting_coverage(c: &Cell, k: usize, mask: u32, axis: u8) -> f32 {
     // Fall back across a shade change, rather than boosting colors already
     // represented in the neighboring cell (e.g. mixed boundary pixels).
-    if c.coverage[k] > 0.0 {
-        return c.coverage[k];
+    if c.coverage(k) > 0.0 {
+        return c.coverage(k);
     }
     let amount = labels(mask)
-        .filter(|&label| c.line[label] >= 0.60 && c.direction[label] == axis)
-        .map(|label| c.coverage[label])
+        .filter(|&label| c.line(label) >= 0.60 && c.direction(label) == axis)
+        .map(|label| c.coverage(label))
         .sum::<f32>();
     // A different broad face is not evidence for a minority line color.
     if amount <= 0.5 { amount } else { 0.0 }
@@ -633,8 +697,8 @@ fn supporting_coverage(c: &Cell, k: usize, mask: u32, axis: u8) -> f32 {
 fn thin_direction(c: &Cell, k: usize, q: &Quantized) -> bool {
     // Half-cell-width straight strokes have lower anisotropy. Accept those
     // only at strong contrast so blended face edges are not promoted to lines.
-    c.line[k] > 0.75
-        || (c.direction[k] < 2 && c.line[k] >= 0.60 && q.distances[k][c.dominant as usize] > 0.05)
+    c.line(k) > 0.75
+        || (c.direction(k) < 2 && c.line(k) >= 0.60 && q.distances[k][c.dominant as usize] > 0.05)
 }
 
 fn contrasting_shades(k: usize, dominant: usize, q: &Quantized, shades: &[u32; 32]) -> u32 {
@@ -647,7 +711,7 @@ fn contrasting_shades(k: usize, dominant: usize, q: &Quantized, shades: &[u32; 3
 fn support_mask(c: &Cell, k: usize, q: &Quantized, shades: &[u32; 32]) -> u32 {
     // Similar shades may support a high-contrast subcell contour, never a
     // low-contrast face or a different opacity. Selection still uses real colors.
-    if c.coverage[k] <= 0.5
+    if c.coverage(k) <= 0.5
         && thin_direction(c, k, q)
         && q.distances[k][c.dominant as usize] > 0.008
     {
@@ -674,7 +738,7 @@ fn directional_support(
                 neighbor(i, dx * sign, dy * sign, g).map_or(0.0, |n| {
                     let other = &cells[n];
                     // Subcell lines must agree on orientation; solid cells also support a contour.
-                    let orientation = if other.line[k] > 0.5 && other.direction[k] != axis as u8 {
+                    let orientation = if other.line(k) > 0.5 && other.direction(k) != axis as u8 {
                         0.25
                     } else {
                         1.0
@@ -684,9 +748,9 @@ fn directional_support(
             };
             let a = support(-1);
             let b = support(1);
-            let own = if c.line[k] > 0.45 {
-                if c.direction[k] == axis as u8 {
-                    c.line[k]
+            let own = if c.line(k) > 0.45 {
+                if c.direction(k) == axis as u8 {
+                    c.line(k)
                 } else {
                     0.0
                 }
@@ -707,8 +771,8 @@ fn straight_spill(
     shades: &[u32; 32],
 ) -> bool {
     let c = &cells[i];
-    let axis = c.direction[k] as usize;
-    if axis > 1 || c.line[k] < 0.90 || q.distances[k][c.dominant as usize] <= 0.008 {
+    let axis = c.direction(k) as usize;
+    if axis > 1 || c.line(k) < 0.90 || q.distances[k][c.dominant as usize] <= 0.008 {
         return false;
     }
     let mask = contrasting_shades(k, c.dominant as usize, q, shades);
@@ -747,9 +811,9 @@ fn straight_spill(
                 || pair.iter().zip(amounts).any(|(cell, amount)| {
                     amount >= 0.055
                         && !labels(mask).any(|label| {
-                            cell.coverage[label] >= 0.055
-                                && cell.line[label] >= 0.60
-                                && cell.direction[label] as usize == axis
+                            cell.coverage(label) >= 0.055
+                                && cell.line(label) >= 0.60
+                                && cell.direction(label) as usize == axis
                         })
                 })
             {
@@ -813,7 +877,7 @@ pub fn decide(
             }
             let delta = q.distances[c.dominant as usize][k];
             let near = delta <= tolerance;
-            if c.coverage[k] < 0.055
+            if c.coverage(k) < 0.055
                 && !(c.class == Class::Flat
                     && near
                     && ns.clone().any(|n| cells[n].dominant as usize == k))
@@ -823,12 +887,12 @@ pub fn decide(
             if c.boundary_colors == 0 && straight_spill(i, k, cells, g, q, &shades) {
                 continue;
             }
-            let continuity = ns.clone().map(|n| cells[n].coverage[k]).sum::<f32>() / neighbor_count;
+            let continuity = ns.clone().map(|n| cells[n].coverage(k)).sum::<f32>() / neighbor_count;
             let mut edge = directional_support(i, k, cells, g, q, &shades);
             if c.lines & (1 << k) != 0 {
                 // One-sided support preserves endpoints of classified lines.
                 for (axis, &(dx, dy)) in AXES.iter().enumerate() {
-                    if c.line[k] > 0.45 && c.direction[k] != axis as u8 {
+                    if c.line(k) > 0.45 && c.direction(k) != axis as u8 {
                         continue;
                     }
                     for sign in [-1, 1] {
@@ -864,7 +928,7 @@ pub fn decide(
             } else {
                 delta.sqrt() * 0.35
             };
-            let score = c.coverage[k] * coverage_weight
+            let score = c.coverage(k) * coverage_weight
                 + continuity * (0.12 + effective_smoothing)
                 + edge * protect * edge_weight * structure_weight
                 + shape
@@ -874,7 +938,7 @@ pub fn decide(
                     } else {
                         0.0
                     } + if c.silhouette & (1 << k) != 0 {
-                        BUILDING.silhouette * (c.coverage[k] + edge).min(1.0)
+                        BUILDING.silhouette * (c.coverage(k) + edge).min(1.0)
                     } else {
                         0.0
                     } + if c.details & (1 << k) != 0 {
@@ -922,11 +986,9 @@ pub fn decide(
                     && q.distances[seed][before[n] as usize]
                         <= tolerance * if cells[n].silhouette != 0 { 0.2 } else { 1.0 }
                     && cells[n]
-                        .coverage
-                        .iter()
-                        .enumerate()
+                        .coverages()
                         .filter(|(k, _)| q.distances[seed][*k] <= tolerance)
-                        .map(|(_, v)| *v)
+                        .map(|(_, v)| v)
                         .sum::<f32>()
                         >= 0.88
                 {
@@ -950,7 +1012,7 @@ pub fn decide(
 fn boundary_tone(c: &Cell, q: &Quantized, luma: &[f32]) -> Option<f32> {
     if c.boundary_colors.count_ones() < 2
         || c.details != 0
-        || (0..q.colors.len()).any(|k| c.coverage[k] > 0.0 && q.colors[k][3] == 0)
+        || (0..q.colors.len()).any(|k| c.coverage(k) > 0.0 && q.colors[k][3] == 0)
         || labels(c.boundary_colors).any(|a| {
             q.colors[a][3] == 0 || labels(c.boundary_colors).any(|b| q.distances[a][b] > 0.004)
         })
@@ -982,15 +1044,15 @@ fn boundary_tone(c: &Cell, q: &Quantized, luma: &[f32]) -> Option<f32> {
 // than the source brightness merely because one forms a thin stripe in a cell.
 fn coherent_tone(i: usize, cells: &[Cell], q: &Quantized, g: Grid) -> Option<f32> {
     let c = &cells[i];
-    if c.boundary_colors != 0 || c.details != 0 || c.coverage[c.dominant as usize] > 0.75 {
+    if c.boundary_colors != 0 || c.details != 0 || c.coverage(c.dominant as usize) > 0.75 {
         return None;
     }
     let mask: u32 = (0..q.colors.len())
-        .filter(|&k| c.coverage[k] >= 0.1)
+        .filter(|&k| c.coverage(k) >= 0.1)
         .fold(0, |mask, k| mask | (1 << k));
     if mask.count_ones() < 3
         || coverage(c, mask) < 0.88
-        || (0..q.colors.len()).any(|k| c.coverage[k] > 0.0 && q.colors[k][3] == 0)
+        || (0..q.colors.len()).any(|k| c.coverage(k) > 0.0 && q.colors[k][3] == 0)
         || labels(mask)
             .any(|a| q.colors[a][3] == 0 || labels(mask).any(|b| q.distances[a][b] > 0.018))
     {
@@ -1000,7 +1062,7 @@ fn coherent_tone(i: usize, cells: &[Cell], q: &Quantized, g: Grid) -> Option<f32
         .filter(|&k| q.distances[c.dominant as usize][k] <= 0.018)
         .fold(0, |mask, k| mask | (1 << k));
     for (axis, &(dx, dy)) in AXES[..2].iter().enumerate() {
-        if !labels(mask).any(|k| c.line[k] >= 0.6 && c.direction[k] == axis as u8) {
+        if !labels(mask).any(|k| c.line(k) >= 0.6 && c.direction(k) == axis as u8) {
             continue;
         }
         let mut total = c.source_luma;
@@ -1023,9 +1085,9 @@ fn coherent_tone(i: usize, cells: &[Cell], q: &Quantized, g: Grid) -> Option<f32
                 if (other.source_luma - c.source_luma).abs() > 6.0
                     || coverage(other, family) < 0.88
                     || !labels(family).any(|k| {
-                        other.coverage[k] >= 0.1
-                            && other.line[k] >= 0.6
-                            && other.direction[k] == axis as u8
+                        other.coverage(k) >= 0.1
+                            && other.line(k) >= 0.6
+                            && other.direction(k) == axis as u8
                     })
                 {
                     stopped[side] = true;
@@ -1035,7 +1097,7 @@ fn coherent_tone(i: usize, cells: &[Cell], q: &Quantized, g: Grid) -> Option<f32
                 ambiguous += usize::from(
                     other.boundary_colors == 0
                         && other.details == 0
-                        && labels(family).filter(|&k| other.coverage[k] >= 0.1).count() >= 3,
+                        && labels(family).filter(|&k| other.coverage(k) >= 0.1).count() >= 3,
                 );
                 count += 1;
                 if count == 5 {
@@ -1071,11 +1133,11 @@ fn diagonal_tone(
         return None;
     }
     let mask = (0..q.colors.len())
-        .filter(|&k| c.coverage[k] >= 0.1)
+        .filter(|&k| c.coverage(k) >= 0.1)
         .fold(0u32, |mask, k| mask | (1 << k));
     if mask.count_ones() < 2
         || coverage(c, mask) < 0.88
-        || (0..q.colors.len()).any(|k| c.coverage[k] > 0.0 && q.colors[k][3] == 0)
+        || (0..q.colors.len()).any(|k| c.coverage(k) > 0.0 && q.colors[k][3] == 0)
         || labels(mask).any(|a| {
             labels(mask).any(|b| {
                 q.distances[a][b] > 0.06
@@ -1287,7 +1349,7 @@ pub fn evaluate(
         }
         if matches!(c.class, Class::Edge | Class::Line) {
             let potential = (0..q.colors.len())
-                .filter(|&k| c.coverage[k] >= 0.055)
+                .filter(|&k| c.coverage(k) >= 0.055)
                 .map(|k| directional_support(i, k, cells, g, q, &shades))
                 .fold(0.0, f32::max) as f64;
             edge_total += potential;
@@ -1298,10 +1360,8 @@ pub fn evaluate(
         let area = ((x + 1) * w / g.width as usize - x * w / g.width as usize)
             * ((y + 1) * h / g.height as usize - y * h / g.height as usize);
         error += c
-            .coverage
-            .iter()
-            .enumerate()
-            .map(|(k, &v)| v as f64 * q.distances[k][color] as f64)
+            .coverages()
+            .map(|(k, v)| v as f64 * q.distances[k][color] as f64)
             .sum::<f64>()
             * area as f64;
     }

@@ -102,5 +102,41 @@ fn cli_output_modes_reports_and_errors() {
         assert!(!result.status.success());
         assert!(!output.exists());
     }
+    // Both spellings name the same new file; reject before creating either.
+    let output = temp.join("alias.png");
+    let report = temp.join(".").join("alias.png");
+    let result = Command::new(binary)
+        .arg(&input)
+        .arg(&output)
+        .arg("--report")
+        .arg(&report)
+        .output()
+        .unwrap();
+    assert!(!result.status.success());
+    assert!(String::from_utf8_lossy(&result.stderr).contains("different files"));
+    assert!(!output.exists());
+
+    // A missing parent is rejected before output, and an OS-level create
+    // failure after reserving the PNG must roll it back too.
+    let invalid_name = if cfg!(windows) {
+        "invalid?.json".to_owned()
+    } else {
+        "x".repeat(512)
+    };
+    for report in [temp.join("missing/report.json"), temp.join(invalid_name)] {
+        let result = Command::new(binary)
+            .arg(&input)
+            .arg(&output)
+            .args(["--grid", "32", "--report"])
+            .arg(&report)
+            .output()
+            .unwrap();
+        assert!(!result.status.success());
+        assert!(
+            !output.exists(),
+            "PNG left after report failure: {report:?}"
+        );
+        assert!(!report.exists());
+    }
     fs::remove_dir_all(temp).unwrap();
 }

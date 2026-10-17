@@ -1,5 +1,57 @@
 use pixelstrict_core::{MAX_INPUT_BYTES, Options, OutputMode, convert};
-use std::{env, fs, path::Path, process};
+use std::{
+    env, fs,
+    io::Write,
+    path::{Path, PathBuf},
+    process,
+};
+
+// Resolve existing parents too, so ./, .. and directory links cannot hide a
+// collision between two new destinations. create_new remains the race guard.
+fn destination(path: &Path) -> Result<PathBuf, String> {
+    let name = path.file_name().ok_or("Output/report must name a file")?;
+    let parent = path.parent().filter(|p| !p.as_os_str().is_empty());
+    let parent = fs::canonicalize(parent.unwrap_or(Path::new(".")))
+        .map_err(|e| format!("Invalid output/report directory: {e}"))?;
+    Ok(parent.join(name))
+}
+
+struct PendingFile {
+    path: PathBuf,
+    file: Option<fs::File>,
+    keep: bool,
+}
+
+impl PendingFile {
+    fn create(path: PathBuf) -> Result<Self, String> {
+        let file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&path)
+            .map_err(|e| e.to_string())?;
+        Ok(Self {
+            path,
+            file: Some(file),
+            keep: false,
+        })
+    }
+
+    fn write(&mut self, bytes: &[u8]) -> Result<(), String> {
+        let file = self.file.as_mut().unwrap();
+        file.write_all(bytes).map_err(|e| e.to_string())?;
+        file.sync_all().map_err(|e| e.to_string())
+    }
+}
+
+impl Drop for PendingFile {
+    fn drop(&mut self) {
+        // Close before removal on Windows; never remove a pre-existing file.
+        drop(self.file.take());
+        if !self.keep {
+            let _ = fs::remove_file(&self.path);
+        }
+    }
+}
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args_os().skip(1).collect();
@@ -77,10 +129,20 @@ fn run() -> Result<(), String> {
     {
         return Err("Output extension must be .png".into());
     }
-    if Path::new(&args[1]).exists() || report.as_ref().is_some_and(|p| Path::new(p).exists()) {
+    let output_path = destination(Path::new(&args[1]))?;
+    let report_path = report
+        .as_ref()
+        .map(|p| destination(Path::new(p)))
+        .transpose()?;
+    if output_path.exists() || report_path.as_ref().is_some_and(|p| p.exists()) {
         return Err("Output/report already exists; choose new paths".into());
     }
-    if report.as_ref().is_some_and(|p| p == &args[1]) {
+    if report_path.as_ref().is_some_and(|p| {
+        p == &output_path
+            || (cfg!(windows)
+                && p.to_string_lossy()
+                    .eq_ignore_ascii_case(&output_path.to_string_lossy()))
+    }) {
         return Err("Output and report must be different files".into());
     }
     let metadata = fs::metadata(&args[0]).map_err(|e| e.to_string())?;
@@ -89,23 +151,16 @@ fn run() -> Result<(), String> {
     }
     let bytes = fs::read(&args[0]).map_err(|e| e.to_string())?;
     let converted = convert(&bytes, &options)?;
-    use std::io::Write;
-    let mut output = fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&args[1])
-        .map_err(|e| e.to_string())?;
-    output
-        .write_all(&converted.png)
-        .map_err(|e| e.to_string())?;
     let json = serde_json::to_string_pretty(&converted.report).map_err(|e| e.to_string())?;
-    if let Some(path) = report {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
-            .map_err(|e| e.to_string())?;
-        file.write_all(json.as_bytes()).map_err(|e| e.to_string())?;
+    let mut output = PendingFile::create(output_path)?;
+    let mut report = report_path.map(PendingFile::create).transpose()?;
+    output.write(&converted.png)?;
+    if let Some(file) = &mut report {
+        file.write(json.as_bytes())?;
+    }
+    output.keep = true;
+    if let Some(file) = &mut report {
+        file.keep = true;
     }
     println!("{json}");
     Ok(())

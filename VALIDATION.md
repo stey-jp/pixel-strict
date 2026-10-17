@@ -253,3 +253,21 @@ Windows x64 / Flutter 3.47.0 / Dart 3.13.0 / Rust 1.97.1。新規依存なし。
 - Windows成果物: `app/build/windows/x64/runner/Release/`、CLI: `core/target/release/pixelstrict.exe`。既存`output/`のMVP ZIP / APKは更新せず、Git対象にも含めていません。
 
 今回の範囲で未解決のテスト失敗なし。MSVCの日本語インポートライブラリ作成メッセージがRustの`linker_messages`警告として出る既知の環境要因は継続（リンク成功、clippy指摘なし）。Android / macOS / iOSの再ビルド・実機検証は今回未実施。Web成果物・対象URLはなく、PSI / Lighthouse / Chrome CDP Issuesは対象外。GitHub Actions workflowとDeployment登録はともに0件のため、自動デプロイの検証対象なし。
+
+
+## レビュー指摘対応（2026-10-17、v0.1.10+11）
+
+Windows x64 / Rust 1.97.1。新規依存なし。Preserve / Logicalの仕様・既定値・原寸候補・セル数上限は維持。
+
+- セルの統計は出現色のみ保持し、単色セルは統計配列のヒープ確保なし。Windows x64の`Cell`本体は332→72バイト。セル本体・混色統計配列の確保は`try_reserve_exact`で失敗を返す。入力デコード等を含む全メモリ確保やOSによる強制終了を回復できるという保証ではない。
+- 変更前CLIと変更後Release CLIを同じPCで逐次実行。1024×1024の32px単色セル合成画像・Preserve AutoでピークWorking Set **351.74→91.21 MiB**、処理時間1327.99→790.87ms。原寸候補だけの実行でも351.35→91.12 MiB、916.09→568.14ms。単発のWindows CLI測定で、FlutterのメモリやAndroid実機の値ではない。入力内容・混色数によりメモリ量は変わる。
+- 同寸法の12px / 21px画像、Logical、32色・透明色を含む97×67の非整除グリッド、原寸グリッドを合わせた7ケースで、変更前後のPNGバイト列と`processing_ms`以外の全Report項目が完全一致。
+- `cargo test --locked --manifest-path core/Cargo.toml`: **45件成功**。既存画質・形状・出力モード・FFI回帰に加え、CLIの同一出力先の別表記、レポートの親ディレクトリ不在、PNGを予約した後のレポート作成失敗で不要なPNGが残らないことを確認。既存出力の上書き防止を維持。
+- `cargo clippy --locked --manifest-path core/Cargo.toml --all-targets -- -D warnings`: **指摘なし**。Rust Release CLIのビルド成功。
+- `flutter test --no-pub`: **2件成功**。390×844 / 1280×800 / 1280×600でPreserve案内の表示・Logical切替、固定操作、pubspec由来のバージョン表示、非対応拡張子の日本語エラーを確認。テスト間でasset Futureが別のfake-async zoneに残らないようキャッシュを分離。
+- `flutter analyze --no-pub`: **指摘なし**。Dart整形検査も成功。
+- `flutter build windows --release --no-pub`: **成功**。exeのFileVersion / ProductVersionはともに`0.1.10+11`。同梱`pixelstrict_core.dll`を直接C ABI経由で呼び出し、1024×1024 AutoのPNGと時間以外のReportが変更前CLIと完全一致することを確認。Pythonホストを含むピークWorking Setは105.49 MiBで、省メモリ版が成果物へ反映されていることを確認。
+- Windows FFI統合テスト: **3件成功**。変換・保存・再現性・同期ズーム／パン・古い結果の無効化・非整除Gridの日本語エラー・ファイルアクセス失敗の日本語表示を検証。画面キャプチャでPreserve案内・結果表示・固定操作のレイアウトを確認。
+- 起動スクリプトはPowerShell 5.1.26100.9711 / 7.6.5の両方で検証。実際のネイティブcmd終了コードとstderrを使い、依存解決失敗時は起動せず、依存解決後の既知のsymlink権限エラーだけjunctionで回避。成功・失敗とも呼出元の作業ディレクトリとRust環境変数を復元。既存junctionの参照先を更新し、古いプラグイン本体が保持されることも確認。
+- Android build hookのNDK compiler未設定は明示的な設定エラーに変更。Android / macOS / iOSのビルド・署名・実機操作は今回未検証。Androidの配布署名と初回MVPの既存ZIP / APKは変更していない。
+- 最新shared-ci mainのREADME・setup・中央登録を確認。公開repoは対象外の方針で、pixel-strictのWorkflow・Deploymentはともに0件。CI追加・公開処理は行っていない。Web成果物・対象URLはなく、PSI / Lighthouse / CDP Issuesは対象外。
